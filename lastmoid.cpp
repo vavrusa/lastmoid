@@ -310,8 +310,9 @@ bool Lastmoid::parseStatData()
       BarLabel* label = new BarLabel(d->dataWidget);
 
       // Fix height mismatch and overflowing
-      label->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Maximum);
+      label->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Maximum);
       label->setMaximumHeight(fnm.height());
+      label->setTextFlags(BarLabel::EdgeMark|BarLabel::ElideText);
       switch(d->data) {
       case TopAlbums:
       case TopTracks:
@@ -326,7 +327,7 @@ bool Lastmoid::parseStatData()
          break;
    }
 
-      label->setBar(element.firstChildElement("playcount").text().toInt() / (float) maxCount);
+      label->setBarValue(element.firstChildElement("playcount").text().toInt() / (float) maxCount);
       d->dataLayout->addItem(label);
    }
 
@@ -363,13 +364,14 @@ bool Lastmoid::parseRecentTracks()
       // Fix height mismatch and overflowing
       label->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Maximum);
       label->setMaximumHeight(fnm.height());
+      label->setTextFlags(BarLabel::ElideText);
       label->setText(QString(" %1 - %2")
                      .arg(element.firstChildElement("artist").text())
                      .arg(element.firstChildElement("name").text()));
 
       // Flip-flop
       if((flip = !flip))
-         label->setBar(1.0);
+         label->setBarValue(1.0);
 
       d->dataLayout->addItem(label);
    }
@@ -421,11 +423,8 @@ void Lastmoid::paintInterface(QPainter *p, const QStyleOptionGraphicsItem *optio
    // User string
    p->save();
    QPoint headerPt(contentsRect.topLeft());
-   QFont headerFont(font);
-   font.setPixelSize(8);
    headerPt.setX(hAlign);
    headerPt.setY(headerPt.y() + d->svgLogo.size().height() + 2);
-   p->setFont(headerFont);
    p->setPen(QColor(213,13,6));
    p->drawText(headerPt, d->login);
 
