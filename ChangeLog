@@ -1,0 +1,26 @@
+0.6
+    - Complete code refactoring and cleanup
+    - Unified header handling, picture loading
+    - Refactored configuration
+    - Removed old rendering code
+    - Moved to Plasma-based API
+    - Reflecting busy state
+0.5
+    - Cut too long data
+    - Recent played tacks available
+
+0.4
+    - Refresh bug fixed
+    - 3 months / 12 months / Overall charts available
+    - Album charts available
+    - Add an Icon
+
+0.3
+    - Bug fixes
+    - New logo
+    - Adding a tool to set :
+      * LastFm user
+      * Chart
+
+0.1
+    - First draft of the weekly artist chart
