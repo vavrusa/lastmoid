@@ -321,7 +321,7 @@ bool Lastmoid::parseStatData()
                         .arg(element.firstChildElement("name").text()));
          break;
       case TopArtists:
-         label->setText(element.firstChildElement("name").text());
+         label->setText(QString(" ") + element.firstChildElement("name").text());
          break;
       default:
          break;
