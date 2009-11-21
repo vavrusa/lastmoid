@@ -17,7 +17,7 @@ Installation
 tar xvzf lastmoid-0.6.tar.gz
 cd lastmoid-0.6
 mkdir build && cd build
-cmake -DCMAKE_INSTALL_PREFIX=`kde4-config --prefix` .//
+cmake -DCMAKE_INSTALL_PREFIX=`kde4-config --prefix` ..
 make
 make install (as root or with sudo)
 
