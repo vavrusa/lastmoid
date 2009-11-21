@@ -1,0 +1,217 @@
+<ui version="4.0" >
+ <class>lastmoidConfig</class>
+ <widget class="QWidget" name="lastmoidConfig" >
+  <property name="geometry" >
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>333</width>
+    <height>262</height>
+   </rect>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout" >
+   <item>
+    <widget class="QTabWidget" name="tabWidget" >
+     <property name="currentIndex" >
+      <number>0</number>
+     </property>
+     <widget class="QWidget" name="tab" >
+      <attribute name="title" >
+       <string>General</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_2" >
+       <item>
+        <widget class="QLabel" name="label" >
+         <property name="text" >
+          <string>LastFm User :</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="user" >
+         <property name="enabled" >
+          <bool>true</bool>
+         </property>
+         <property name="minimumSize" >
+          <size>
+           <width>300</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="text" >
+          <string>DmLast</string>
+         </property>
+         <property name="frame" >
+          <bool>true</bool>
+         </property>
+         <property name="dragEnabled" >
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_2" >
+         <property name="text" >
+          <string>Chart size :</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QSpinBox" name="nbDatas" >
+         <property name="minimumSize" >
+          <size>
+           <width>300</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="minimum" >
+          <number>1</number>
+         </property>
+         <property name="value" >
+          <number>8</number>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_3" >
+         <property name="text" >
+          <string>Data :</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="dataType" >
+         <property name="minimumSize" >
+          <size>
+           <width>300</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="currentIndex" >
+          <number>0</number>
+         </property>
+         <item>
+          <property name="text" >
+           <string>artist</string>
+          </property>
+         </item>
+         <item>
+          <property name="text" >
+           <string>recentTracks</string>
+          </property>
+         </item>
+         <item>
+          <property name="text" >
+           <string>album</string>
+          </property>
+         </item>
+         <item>
+          <property name="text" >
+           <string>track</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_4" >
+         <property name="text" >
+          <string>Period :</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="dataPeriod" >
+         <property name="minimumSize" >
+          <size>
+           <width>300</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="currentIndex" >
+          <number>0</number>
+         </property>
+         <item>
+          <property name="text" >
+           <string>weekly</string>
+          </property>
+         </item>
+         <item>
+          <property name="text" >
+           <string>overall</string>
+          </property>
+         </item>
+         <item>
+          <property name="text" >
+           <string>3month</string>
+          </property>
+         </item>
+         <item>
+          <property name="text" >
+           <string>6month</string>
+          </property>
+         </item>
+         <item>
+          <property name="text" >
+           <string>12month</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="tab_2" >
+      <attribute name="title" >
+       <string>Advanced</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_3" >
+       <item>
+        <widget class="QLabel" name="label_5" >
+         <property name="text" >
+          <string>Update Time (min) :</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QSpinBox" name="timer" >
+         <property name="minimumSize" >
+          <size>
+           <width>300</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="minimum" >
+          <number>1</number>
+         </property>
+         <property name="value" >
+          <number>5</number>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_6" >
+         <property name="minimumSize" >
+          <size>
+           <width>0</width>
+           <height>110</height>
+          </size>
+         </property>
+         <property name="text" >
+          <string>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd">
+&lt;html>&lt;head>&lt;meta name="qrichtext" content="1" />&lt;style type="text/css">
+p, li { white-space: pre-wrap; }
+&lt;/style>&lt;/head>&lt;body style=" font-family:'Nimbus Sans L'; font-size:8pt; font-weight:400; font-style:normal;">
+&lt;p align="center" style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">LastMoid for Kde4.X&lt;/p>
+&lt;p align="center" style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">Damien Levin&lt;/p>
+&lt;p align="center" style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">&lt;a href="http://www.kde-look.org/content/show.php/Lastmoid?content=98117">&lt;span style=" text-decoration: underline; color:#0000ff;">http://www.kde-look.org&lt;/span>&lt;/a>&lt;/p>&lt;/body>&lt;/html></string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

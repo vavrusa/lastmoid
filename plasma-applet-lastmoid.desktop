@@ -1,0 +1,17 @@
+[Desktop Entry]
+Name=Lastmoid
+Comment=LastFM widget
+Type=Service
+ServiceTypes=Plasma/Applet
+Icon=view-statistics                                        
+ 
+X-KDE-Library=plasma_applet_lastmoid
+X-KDE-PluginInfo-Author=Damien Levin
+X-KDE-PluginInfo-Email=dml_aon@hotmail.com
+X-KDE-PluginInfo-Name=plasma_applet_lastmoid
+X-KDE-PluginInfo-Version=0.5
+X-KDE-PluginInfo-Website=http://plasma.kde.org/
+X-KDE-PluginInfo-Category=Online Services
+X-KDE-PluginInfo-Depends=
+X-KDE-PluginInfo-License=GPL
+X-KDE-PluginInfo-EnabledByDefault=true
