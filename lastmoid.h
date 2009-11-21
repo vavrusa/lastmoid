@@ -1,5 +1,6 @@
 /***************************************************************************
  *   Copyright (C) 2008 by Damien Lévin <dml_aon@hotmail.com>      	   *
+ *                 2009 by Marek Vavrusa <marek@vavrusa.com>      	   *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -17,27 +18,20 @@
  *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA .        *
  ***************************************************************************/
  
+#ifndef LASTMOID_H
+#define LASTMOID_H
 
-#ifndef Plasmoid_HEADER
-#define Plasmoid_HEADER
-
-
-#include <KIcon>
 #include <Plasma/Applet>
 #include <Plasma/Svg>
+#include <Plasma/Theme>
 #include <QHttp>
 #include <QString>
-#include <QList>
-#include <QStringList>
 #include <QTimer>
 #include <QUrl>
+#include <QBuffer>
 #include <KConfigGroup>
 
 #include "ui_lastmoidConfig.h"
-
-
-class QSizeF;
- 
 
 class Lastmoid : public Plasma::Applet
 {
@@ -48,41 +42,28 @@ class Lastmoid : public Plasma::Applet
         ~Lastmoid();
 
         void paintInterface(QPainter *painter, const QStyleOptionGraphicsItem *option,const QRect& contentsRect);
-	void fetch();
-	void parseXmlTop();
-	void parseXmlRecentTracks();
-	void loadConfig();
-
-
+        void fetch();
+        void loadConfig();
 
     public slots:
-
-	void finished(int id, bool error);
-	void refresh();
+        void init();
+        void refresh();
+        void httpResponse(int id, bool error);
 
     protected slots:
         void configAccepted();
 
     protected:
+        void clearList();
+        bool parseUserData();
+        bool parseStatData();
+        bool parseRecentTracks();
         void createConfigurationInterface(KConfigDialog *parent);
 
     private:
-
- 	Ui::lastmoidConfig uiConfig;
-        Plasma::Svg m_svg;
-        KIcon m_icon;
-	KConfigGroup configGroup;
-	
-	int connectionId;
-	int nbDatas;
-	int updateFrequency;
-	QString lastUser;
-	QString dataType;  
-	QString dataPeriod;  
-	QUrl url;
-	QHttp http;
-	QTimer *timer;
-	QList<QStringList> datas;
+        struct Private;
+        Private *d;
 };
+
 K_EXPORT_PLASMA_APPLET(lastmoid, Lastmoid)
 #endif

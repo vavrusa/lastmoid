@@ -1,6 +1,6 @@
 /***************************************************************************
  *   Copyright (C) 2008 by Damien Lévin <dml_aon@hotmail.com>      	   *
- *                                                                         *
+ *                 2009 by Marek Vavrusa <marek@vavrusa.com>      	   *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
  *   the Free Software Foundation; either version 3 of the License, or     *
@@ -17,295 +17,445 @@
  *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA .        *
  ***************************************************************************/
 
-
-#include "lastmoid.h"
-
-
-#include <plasma/svg.h>
-#include <plasma/theme.h>
-#include <QDebug> 
+#include <Plasma/ScrollWidget>
+#include <Plasma/BusyWidget>
+#include <QGraphicsLinearLayout>
 #include <QDomDocument>
 #include <QDomElement>
-#include <QRectF>
 #include <QPainter>
 #include <KConfigDialog>
+#include "lastmoid.h"
+#include "barlabel.h"
 
+// Data type (mapped to selector)
+enum Data {
+   RecentTracks = 0,
+   TopAlbums    = 1,
+   TopArtists   = 2,
+   TopTracks    = 3
+};
 
-Lastmoid::Lastmoid(QObject *parent, const QVariantList &args) : Plasma::Applet(parent, args) 
+// Data period
+enum Period {
+   Weekly       = 0,
+   Overall      = 1,
+   ThreeMonths  = 2,
+   SixMonths    = 3,
+   TwelveMonths = 4
+};
 
+// State tracking
+enum State {
+   NotFound    = 0x00, // User not found
+   Finalizing  = 0x01, // Querying user
+   Identified  = 0x02  // Matching user found
+};
+
+struct Lastmoid::Private
 {
+   Private() : interval(0), data(0), period(0), state(NotFound),
+               layout(0), scrollWidget(0), dataWidget(0),
+               dataLayout(0), busyWidget(0)
+   {}
 
-    m_svg.setImagePath("widgets/lastmoid");
-    timer = new QTimer(this);
+   // Config
+   int interval;
+   int data;
+   int period;
+   QString dataStr;
+   QString periodStr;
+   QString login;
 
-    connect(&http, SIGNAL(requestFinished(int, bool)),this, SLOT(finished(int, bool)));
-    connect(timer, SIGNAL(timeout()), this, SLOT(refresh()));
-    
-    setBackgroundHints(DefaultBackground);
-    resize(200, 230);
+   // Containers
+   State state;
+   QImage avatar;
+   QUrl url;
+   QHttp http;
+   QBuffer buffer;
+   QTimer timer;
+   Ui::lastmoidConfig configUi;
+   Plasma::Svg svgLogo;
+   KConfigGroup configGroup;
 
-    refresh();
+   // Widgets
+   QGraphicsLinearLayout* layout;
+   Plasma::ScrollWidget* scrollWidget;
+   QGraphicsWidget*      dataWidget;
+   QGraphicsLinearLayout* dataLayout;
+   Plasma::BusyWidget*    busyWidget;
+};
 
+Lastmoid::Lastmoid(QObject *parent, const QVariantList &args)
+   : Plasma::Applet(parent, args), d(new Private)
+{
+   d->svgLogo.setImagePath("widgets/lastmoid");
+   setBackgroundHints(DefaultBackground);
+   resize(220, 300);
 }
- 
- 
+
+
 Lastmoid::~Lastmoid()
 {
-   timer->stop();
-   delete timer;
+   delete d;
+   d->timer.stop();
+}
+
+void Lastmoid::init()
+{
+   // Prepare scroll widget
+   QFontMetrics fm(font());
+   d->scrollWidget = new Plasma::ScrollWidget(this);
+   d->dataWidget = new QGraphicsWidget(d->scrollWidget);
+   d->scrollWidget->setWidget(d->dataWidget);
+   d->dataLayout = new QGraphicsLinearLayout(Qt::Vertical, d->dataWidget);
+   d->busyWidget = new Plasma::BusyWidget(this);
+
+   // Contents widget
+   d->layout = new QGraphicsLinearLayout(Qt::Vertical, this);
+   d->layout->setContentsMargins(0,60 + fm.height() * 0.5,0,0);
+   d->layout->addItem(d->busyWidget);
+
+   connect(&d->timer, SIGNAL(timeout()), this, SLOT(refresh()));
+   connect(&d->http, SIGNAL(requestFinished(int, bool)),this, SLOT(httpResponse(int, bool)));
+
+   loadConfig();
+   fetch();
 }
 
 
 void Lastmoid::refresh()
 {
+   d->timer.stop();
+   d->timer.setInterval(d->interval * 60 * 1000);
+   d->timer.start();
    fetch();
-   timer->stop();
-   timer->setInterval(updateFrequency * 60 * 1000);
-   timer->start();
 }
 
 
 void Lastmoid::createConfigurationInterface(KConfigDialog *parent)
 {
 
-	QWidget *widgetConfig = new QWidget;
-	configGroup = config();
-	uiConfig.setupUi(widgetConfig);
-	uiConfig.user->setText(configGroup.readEntry("user"));
-	uiConfig.nbDatas->setValue(QString(configGroup.readEntry("nbDatas")).toInt());
-	uiConfig.dataType->setCurrentIndex(uiConfig.dataType->findText(configGroup.readEntry("dataType")));
-	uiConfig.dataPeriod->setCurrentIndex(uiConfig.dataPeriod->findText(configGroup.readEntry("dataPeriod")));
+   QWidget *widgetConfig = new QWidget;
+   d->configGroup = config();
+   d->configUi.setupUi(widgetConfig);
+   d->configUi.user->setText(d->configGroup.readEntry("user"));
+   d->configUi.dataType->setCurrentIndex(d->configGroup.readEntry("dataType", "0").toInt());
+   d->configUi.dataPeriod->setCurrentIndex(d->configGroup.readEntry("dataPeriod", "1").toInt());
+   d->configUi.timer->setValue(d->configGroup.readEntry("timer", "5").toInt());
 
-	connect(parent, SIGNAL(okClicked()), this, SLOT(configAccepted()));
-	parent->setButtons(KDialog::Ok | KDialog::Cancel);
-	parent->addPage(widgetConfig, i18n("Configuration"), icon());
-
+   connect(parent, SIGNAL(okClicked()), this, SLOT(configAccepted()));
+   parent->setButtons(KDialog::Ok | KDialog::Cancel);
+   parent->addPage(widgetConfig, i18n("Configuration"), icon());
 }
 
 
 
-void Lastmoid::configAccepted(){
-    
-    lastUser = uiConfig.user->text();
-    nbDatas = uiConfig.nbDatas->value();
-    dataType = uiConfig.dataType->currentText();
-    dataPeriod = uiConfig.dataPeriod->currentText();
-    updateFrequency = uiConfig.timer->value();
+void Lastmoid::configAccepted()
+{
+   d->login = d->configUi.user->text();
+   d->data = d->configUi.dataType->currentIndex();
+   d->period = d->configUi.dataPeriod->currentIndex();
+   d->interval = d->configUi.timer->value();
 
-    configGroup = config();
-    configGroup.writeEntry("user", lastUser);
-    configGroup.writeEntry("nbDatas",QString::number(nbDatas));
-    configGroup.writeEntry("dataType",dataType);
-    configGroup.writeEntry("dataPeriod",dataPeriod);
-    configGroup.writeEntry("timer",QString::number(updateFrequency));
+   d->configGroup = config();
+   d->configGroup.writeEntry("user", d->login);
+   d->configGroup.writeEntry("dataType",QString::number(d->data));
+   d->configGroup.writeEntry("dataPeriod",QString::number(d->period));
+   d->configGroup.writeEntry("timer",QString::number(d->interval));
+   d->configGroup.sync();
 
-    
-    refresh();
+   loadConfig();
+   clearList();
+   d->layout->removeAt(0);
+   d->layout->addItem(d->busyWidget);
+   d->busyWidget->show();
+
+   d->timer.stop();
+   d->avatar = QImage();
+   d->state = NotFound; // De-initialise current user
+   refresh();
 }
 
 
-void Lastmoid::loadConfig(){
+void Lastmoid::loadConfig()
+{
+   static QString dataTable[4] = {
+      "recentTracks", "album", "artist", "track" };
+   static QString periodTable[5] = {
+      "weekly", "overall", "3month", "6month", "12month" };
 
-    configGroup = config();
-    lastUser = configGroup.readEntry("user");
-    nbDatas = QString(configGroup.readEntry("nbDatas")).toInt();
-    dataType = configGroup.readEntry("dataType");
-    dataPeriod = configGroup.readEntry("dataPeriod");
-    updateFrequency =  QString(configGroup.readEntry("timer")).toInt();
+   d->configGroup = config();
+   d->login = d->configGroup.readEntry("user");
+   d->data = d->configGroup.readEntry("dataType").toInt();\
+   d->dataStr = dataTable[d->data % 4];
+   d->period = d->configGroup.readEntry("dataPeriod").toInt();
+   d->periodStr = periodTable[d->period % 5];
+   d->interval =  QString(d->configGroup.readEntry("timer")).toInt();
 
-    if (updateFrequency==0){
-      updateFrequency=5; 
-    }
-
+   if(d->interval == 0)
+      d->interval = 5;
 }
 
 
 void Lastmoid::fetch()
- {
-
-    loadConfig();
-
-    if (QString::compare(dataType,QString("recentTracks"))==0){
-      //Recent Tracks
-      url.setUrl("http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user="+lastUser+"&api_key=b6eb61f91b89e55548dd14732ee0b8a1");
-    }else{
-      //Top dataType
-      if (QString::compare(dataPeriod,QString("weekly"))==0){
-	  url.setUrl("http://ws.audioscrobbler.com/2.0/?method=user.getweekly"+dataType+"chart&user="+lastUser+"&api_key=b6eb61f91b89e55548dd14732ee0b8a1");
-      }else{
-	  url.setUrl("http://ws.audioscrobbler.com/2.0/?method=user.gettop"+dataType+"s&user="+lastUser+"&period="+dataPeriod+"&api_key=b6eb61f91b89e55548dd14732ee0b8a1");   
-      }
-    }
-
-    datas.clear();
-
-    http.setHost(url.host());
-    connectionId = http.get(url.toString ());
- }
-
-
- void Lastmoid::finished(int id, bool error)
- {
-     if (error) {
-         qWarning("Received error during HTTP fetch.");
-     }else{
-      if (QString::compare(dataType,QString("recentTracks"))==0){
-	  //Recent Tracks
-	  parseXmlRecentTracks();
-      }else{
-	  //Top dataType
-	  parseXmlTop();
-      }
-    }
-    update();
- }
-
-void Lastmoid::parseXmlTop()
- {
- 
-    QDomDocument doc("?xml version=\"1.0\" encoding=\"utf-8\" ?");
-    QDomElement name,playcount,root,element;
-
-    doc.setContent (http.readAll());
-    
-    root = doc.firstChildElement("lfm");  
-    element = root.firstChildElement(dataType);
-
-    if (dataPeriod =="weekly"){
-       element = root.firstChildElement("weekly"+dataType+"chart");
-    }else{
-       element = root.firstChildElement("top"+dataType+"s");
-    }
-    element = element.firstChildElement(dataType);
-  
-  
-    for (; !element.isNull(); element = element.nextSiblingElement(dataType)) {
-
-	QStringList item;
-	
-	name = element.firstChildElement("name");
-	playcount = element.firstChildElement("playcount");
-
-	item.append(element.attribute("rank"));
-	item.append(name.text());
-	item.append(playcount.text());
-
-	datas.append(item);
-
-   }
-
- }
-
-
-void Lastmoid::parseXmlRecentTracks()
 {
-  
-    QDomDocument doc("?xml version=\"1.0\" encoding=\"utf-8\" ?");
-    QDomElement artist,title,album,root,element;
+   // Is user initialised?
+   switch(d->state) {
+   case Identified:
 
-    doc.setContent (http.readAll());
-    
-    root = doc.firstChildElement("lfm");  
-    element = root.firstChildElement("recenttracks");
-    element = element.firstChildElement("track");
-  
-    for (; !element.isNull(); element = element.nextSiblingElement("track")) {
+      // Recent Tracks
+      if(d->data == RecentTracks) {
+         d->url.setUrl("http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user="
+                     + d->login + "&api_key=b6eb61f91b89e55548dd14732ee0b8a1");
+      }
+      else {
+         // Top dataType
+         if(d->period == Weekly)
+            d->url.setUrl("http://ws.audioscrobbler.com/2.0/?method=user.getweekly"
+                        + d->dataStr + "chart&user="
+                        + d->login + "&api_key=b6eb61f91b89e55548dd14732ee0b8a1");
+         else
+            d->url.setUrl("http://ws.audioscrobbler.com/2.0/?method=user.gettop"
+                        + d->dataStr + "s&user="
+                        + d->login + "&period="
+                        + d->periodStr +"&api_key=b6eb61f91b89e55548dd14732ee0b8a1");
+      }
+      break;
 
-	QStringList item;
-
-	artist = element.firstChildElement("artist");
-	title = element.firstChildElement("name");
-	album = element.firstChildElement("album");
-
-	item.append(artist.text());
-	item.append(title.text());
-	item.append(album.text());
-    
-	datas.append(item);
-
+   default:
+      d->url.setUrl("http://ws.audioscrobbler.com/2.0/?method=user.getinfo&user="
+                    + d->login + "&api_key=b6eb61f91b89e55548dd14732ee0b8a1");
+      break;
    }
- }
 
+   // Execute request
+   d->http.setHost(d->url.host());
+   d->http.get(d->url.toString());
+}
+
+void Lastmoid::httpResponse(int id, bool error)
+{
+   if(error) {
+      qWarning("Received error during HTTP fetch.");
+      update();
+      return;
+   }
+
+   bool result = false;
+   switch(d->state) {
+   case NotFound:
+      result = parseUserData();
+      break;
+
+   case Finalizing:
+      d->avatar.loadFromData(d->buffer.buffer(), "JPG");
+      if(!d->avatar.isNull()) {
+         d->avatar = d->avatar.scaledToHeight(60);
+         d->state = Identified;
+         if(d->buffer.isOpen())
+            d->buffer.close();
+         refresh();
+         result = true;
+      }
+      break;
+
+   case Identified:
+      if(d->data == RecentTracks) result = parseRecentTracks();
+      else                        result = parseStatData();
+      if(result && d->busyWidget->isVisible()) {
+         d->layout->removeAt(0);
+         d->layout->addItem(d->scrollWidget);
+         d->busyWidget->hide();
+      }
+      break;
+
+   default:
+      break;
+   }
+
+   if(result) {
+      update();
+   }
+}
+
+bool Lastmoid::parseStatData()
+{
+
+   QDomDocument doc("?xml version=\"1.0\" encoding=\"utf-8\" ?");
+   QDomElement root, element;
+   doc.setContent(d->http.readAll());
+   root = doc.firstChildElement("lfm");
+   element = root.firstChildElement(d->dataStr);
+
+   if(d->period == Weekly)
+      element = root.firstChildElement("weekly" + d->dataStr + "chart");
+   else
+      element = root.firstChildElement("top" + d->dataStr + "s");
+
+   // Enter group
+   element = element.firstChildElement(d->dataStr);
+   if(!element.isNull()) {
+      // Clear list
+      clearList();
+   }
+   else {
+      return false;
+   }
+
+   // Add all elements
+   QFontMetrics fnm(font());
+   int maxCount = element.firstChildElement("playcount").text().toInt();
+   for(;!element.isNull(); element = element.nextSiblingElement(d->dataStr)) {
+
+      BarLabel* label = new BarLabel(d->dataWidget);
+
+      // Fix height mismatch and overflowing
+      label->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Maximum);
+      label->setMaximumHeight(fnm.height());
+      switch(d->data) {
+      case TopAlbums:
+      case TopTracks:
+         label->setText(QString(" %1 - %2")
+                        .arg(element.firstChildElement("artist").firstChildElement("name").text())
+                        .arg(element.firstChildElement("name").text()));
+         break;
+      case TopArtists:
+         label->setText(element.firstChildElement("name").text());
+         break;
+      default:
+         break;
+   }
+
+      label->setBar(element.firstChildElement("playcount").text().toInt() / (float) maxCount);
+      d->dataLayout->addItem(label);
+   }
+
+   return true;
+}
+
+
+bool Lastmoid::parseRecentTracks()
+{
+
+   QDomDocument doc("?xml version=\"1.0\" encoding=\"utf-8\" ?");
+   QDomElement root, element;
+
+   doc.setContent (d->http.readAll());
+   root = doc.firstChildElement("lfm");
+   element = root.firstChildElement("recenttracks");
+   element = element.firstChildElement("track");
+
+   // Check expected element
+   if(!element.isNull()) {
+      // Clear list
+      clearList();
+   }
+   else {
+      return false;
+   }
+
+   // Add new items
+   QFontMetrics fnm(font());
+   for (bool flip = true; !element.isNull(); element = element.nextSiblingElement("track")) {
+
+      BarLabel* label = new BarLabel(d->dataWidget);
+
+      // Fix height mismatch and overflowing
+      label->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Maximum);
+      label->setMaximumHeight(fnm.height());
+      label->setText(QString(" %1 - %2")
+                     .arg(element.firstChildElement("artist").text())
+                     .arg(element.firstChildElement("name").text()));
+
+      // Flip-flop
+      if((flip = !flip))
+         label->setBar(1.0);
+
+      d->dataLayout->addItem(label);
+   }
+
+   return true;
+}
+
+bool Lastmoid::parseUserData()
+{
+
+   QDomDocument doc("?xml version=\"1.0\" encoding=\"utf-8\" ?");
+   QDomElement root, element;
+
+   doc.setContent (d->http.readAll());
+   root = doc.firstChildElement("lfm");
+   element = root.firstChildElement("user");
+   element = element.firstChildElement("image");
+
+   if(!element.isNull()) {
+      d->state = Finalizing;
+      d->buffer.setData(QByteArray());
+      d->buffer.open(QBuffer::ReadWrite);
+      d->url.setUrl(element.text());
+      d->http.setHost(d->url.host());
+      d->http.get(d->url.toString(), &d->buffer);
+      return true;
+   }
+
+   return false;
+}
 
 void Lastmoid::paintInterface(QPainter *p, const QStyleOptionGraphicsItem *option, const QRect &contentsRect)
 {
+   // Applet paint
+   Plasma::Applet::paintInterface(p, option, contentsRect);
 
+   // Measures
+   QFont font = Plasma::Theme::defaultTheme()->font(Plasma::Theme::DefaultFont);
+   QFontMetrics fm(font);
+   int widgetWidth = (int)contentsRect.width();
+   int hAlign = fm.height();
 
-    QFont font = Plasma::Theme::defaultTheme()->font(Plasma::Theme::DefaultFont);
+   // SVG logo
+   p->setRenderHint(QPainter::SmoothPixmapTransform);
+   p->setRenderHint(QPainter::Antialiasing);
+   d->svgLogo.resize(94, 48);
+   d->svgLogo.paint(p,hAlign, (int)contentsRect.top());
 
+   // User string
+   p->save();
+   QPoint headerPt(contentsRect.topLeft());
+   QFont headerFont(font);
+   font.setPixelSize(8);
+   headerPt.setX(hAlign);
+   headerPt.setY(headerPt.y() + d->svgLogo.size().height() + 2);
+   p->setFont(headerFont);
+   p->setPen(QColor(213,13,6));
+   p->drawText(headerPt, d->login);
 
-    int i=1,widgetWidth,widgetHeight,vAlign,hAlign,maxListening=0;
-    QRectF rect;
+   // Avatar
+   QPainterPath avClip;
+   QRect avFrame((int)contentsRect.left() + widgetWidth - 60, (int)contentsRect.top(), 60, 60);
+   avClip.addRoundedRect(QRectF(avFrame), 10.0, 10.0);
+   p->setClipPath(avClip);
+   if(!d->avatar.isNull())
+      p->drawImage(avFrame, d->avatar);
+   p->setClipping(false);
 
-    widgetWidth = (int)contentsRect.width();
-    widgetHeight = (int)contentsRect.height()-60;
-    
-    
-    p->setRenderHint(QPainter::SmoothPixmapTransform);
-    p->setRenderHint(QPainter::Antialiasing);
- 
-
-     hAlign = widgetWidth/10;
-     m_svg.resize(94, 48);
-     m_svg.paint(p,hAlign, (int)contentsRect.top());    
-
-    //Get maxListening 
-    if(datas.size()>=1){	
-	maxListening=datas.at(0).at(2).toInt();
-    }
-
-
-if (QString::compare(dataType,QString("recentTracks"))==0){
-//Recent Tracks display
-    if (nbDatas>10){
-	nbDatas=10; 
-    }
-    for (i=0;i < nbDatas;i++){     
-
-      if((datas.size() > i) ){
-
-	vAlign = (i+1)*widgetHeight/nbDatas+60;
-	
-	rect = QRectF(hAlign,vAlign,widgetWidth-hAlign,-widgetHeight/nbDatas*0.75);
-	if (i%2==1){
-	  p->fillRect(rect,QBrush(QColor(234, 234, 234, 127)));
-	}else{
-	  p->fillRect(rect,QBrush(QColor(215, 0, 25, 200)));
-	}
-	p->setPen(Qt::black);
-	font.setPixelSize((int)(widgetHeight/nbDatas*0.5)); 
-	p->setFont(font);
-	p->drawText(rect,Qt::AlignLeft | Qt::AlignVCenter| Qt::TextWordWrap ,"  "+datas.at(i).at(0)+" - "+datas.at(i).at(1));
-	p->restore();
-	
-      }
-    }
-}else{
-//Top display
-    for (i=0;i < nbDatas;i++){     
-
-      if((datas.size() > i) ){
-
-	vAlign = (i+1)*widgetHeight/nbDatas+60;
-	
-	rect = QRectF(hAlign,vAlign,widgetWidth-hAlign,-widgetHeight/nbDatas*0.75);
-	p->fillRect(rect,QBrush(QColor(234, 234, 234, 127)));
-
-	rect = QRectF(hAlign,vAlign,(widgetWidth-hAlign)*datas.at(i).at(2).toInt()/maxListening,-widgetHeight/nbDatas*0.75);
-	p->fillRect(rect,QBrush(QColor(215, 0, 25, 200)));
-
-	rect = QRectF(hAlign,vAlign,widgetWidth-hAlign,-widgetHeight/nbDatas*0.75);
-	p->setPen(Qt::black);
-	font.setPixelSize((int)(widgetHeight/nbDatas*0.5)); 
-	p->setFont(font);
-	p->drawText(rect,Qt::AlignLeft | Qt::AlignVCenter| Qt::TextWordWrap ,"  "+datas.at(i).at(0)+" - "+datas.at(i).at(1)+" ("+datas.at(i).at(2)+")");
-
-	p->restore();
-	
-      }
-    }
+   // Avatar border
+   QPen pen(p->pen());
+   pen.setColor(Qt::lightGray);
+   pen.setWidth(2);
+   p->setPen(pen);
+   p->drawRoundedRect(avFrame, 10.0, 10.0);
+   p->restore();
 }
 
+void Lastmoid::clearList()
+{
+   while(d->dataLayout->count()) {
+      QGraphicsLayoutItem* item = d->dataLayout->itemAt(0);
+      d->dataLayout->removeAt(0);
+      delete item;
+   }
+
+   d->dataLayout->invalidate();
 }
- 
+
 #include "lastmoid.moc"
