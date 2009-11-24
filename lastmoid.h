@@ -46,6 +46,7 @@ class Lastmoid : public Plasma::Applet
 
     protected slots:
         void configAccepted();
+        void setBusy(bool val);
 
     protected:
         void clearList();

@@ -57,8 +57,8 @@ enum State {
 
 struct Lastmoid::Private
 {
-   Private() : interval(0), data(0), period(0), connId(-1), state(NotFound),
-               layout(0), scrollWidget(0),dataWidget(0), dataLayout(0),
+   Private() : interval(0), data(0), period(0), lastDate(0), connId(-1),
+               state(NotFound), layout(0), dataLayout(0), scrollWidget(0),
                busyWidget(0)
    {}
 
@@ -71,21 +71,19 @@ struct Lastmoid::Private
    QString login;
 
    // Containers
+   int lastDate;
    int connId;
    State state;
    QImage avatar;
-   QUrl url;
    QHttp http;
    QTimer timer;
    Ui::lastmoidConfig configUi;
    Plasma::Svg svgLogo;
-   KConfigGroup configGroup;
 
    // Widgets
    QGraphicsLinearLayout* layout;
-   Plasma::ScrollWidget* scrollWidget;
-   QGraphicsWidget*      dataWidget;
    QGraphicsLinearLayout* dataLayout;
+   Plasma::ScrollWidget* scrollWidget;
    Plasma::BusyWidget*    busyWidget;
 };
 
@@ -110,15 +108,14 @@ void Lastmoid::init()
    // Prepare scroll widget
    QFontMetrics fm(font());
    d->scrollWidget = new Plasma::ScrollWidget(this);
-   d->dataWidget = new QGraphicsWidget(d->scrollWidget);
-   d->scrollWidget->setWidget(d->dataWidget);
-   d->dataLayout = new QGraphicsLinearLayout(Qt::Vertical, d->dataWidget);
+   QGraphicsWidget* dataWidget = new QGraphicsWidget(d->scrollWidget);
+   d->scrollWidget->setWidget(dataWidget);
+   d->dataLayout = new QGraphicsLinearLayout(Qt::Vertical, dataWidget);
    d->busyWidget = new Plasma::BusyWidget(this);
 
    // Contents widget
    d->layout = new QGraphicsLinearLayout(Qt::Vertical, this);
    d->layout->setContentsMargins(0,60 + fm.height() * 0.5,0,0);
-   d->layout->addItem(d->busyWidget);
 
    // Connect timer and http results
    connect(&d->timer, SIGNAL(timeout()), this, SLOT(refresh()));
@@ -129,54 +126,49 @@ void Lastmoid::init()
    fetch();
 }
 
-
 void Lastmoid::refresh()
 {
+   // Reset timer
    d->timer.stop();
    d->timer.setInterval(d->interval * 60 * 1000);
    d->timer.start();
+
+   // Fetch immediately
    fetch();
 }
 
-
 void Lastmoid::createConfigurationInterface(KConfigDialog *parent)
 {
-
+   // Create configuration widget
    QWidget *widgetConfig = new QWidget;
-   d->configGroup = config();
+   KConfigGroup configGroup = config();
    d->configUi.setupUi(widgetConfig);
-   d->configUi.user->setText(d->configGroup.readEntry("user"));
-   d->configUi.dataType->setCurrentIndex(d->configGroup.readEntry("dataType", "0").toInt());
-   d->configUi.dataPeriod->setCurrentIndex(d->configGroup.readEntry("dataPeriod", "1").toInt());
-   d->configUi.timer->setValue(d->configGroup.readEntry("timer", "5").toInt());
+   d->configUi.user->setText(configGroup.readEntry("user"));
+   d->configUi.dataType->setCurrentIndex(configGroup.readEntry("dataType", "0").toInt());
+   d->configUi.dataPeriod->setCurrentIndex(configGroup.readEntry("dataPeriod", "1").toInt());
+   d->configUi.timer->setValue(configGroup.readEntry("timer", "5").toInt());
 
+   // Connect controls
    connect(parent, SIGNAL(okClicked()), this, SLOT(configAccepted()));
    parent->setButtons(KDialog::Ok | KDialog::Cancel);
    parent->addPage(widgetConfig, i18n("Configuration"), icon());
 }
 
-
-
 void Lastmoid::configAccepted()
 {
-   d->login = d->configUi.user->text();
-   d->data = d->configUi.dataType->currentIndex();
-   d->period = d->configUi.dataPeriod->currentIndex();
-   d->interval = d->configUi.timer->value();
+   // Save configuration
+   KConfigGroup configGroup = config();
+   configGroup.writeEntry("user", d->configUi.user->text());
+   configGroup.writeEntry("dataType",QString::number(d->configUi.dataType->currentIndex()));
+   configGroup.writeEntry("dataPeriod",QString::number(d->configUi.dataPeriod->currentIndex()));
+   configGroup.writeEntry("timer",QString::number(d->configUi.timer->value()));
+   configGroup.sync();
 
-   d->configGroup = config();
-   d->configGroup.writeEntry("user", d->login);
-   d->configGroup.writeEntry("dataType",QString::number(d->data));
-   d->configGroup.writeEntry("dataPeriod",QString::number(d->period));
-   d->configGroup.writeEntry("timer",QString::number(d->interval));
-   d->configGroup.sync();
-
+   // Reload configuration
    loadConfig();
-   clearList();
-   d->layout->removeAt(0);
-   d->layout->addItem(d->busyWidget);
-   d->busyWidget->show();
 
+   // Reset list and widgets
+   clearList();
    d->timer.stop();
    d->avatar = QImage();
    d->state = NotFound; // De-initialise current user
@@ -186,23 +178,25 @@ void Lastmoid::configAccepted()
 
 void Lastmoid::loadConfig()
 {
+   // Translate index to QString (watch indexes in lastmoidConfig.ui)
    static QString dataTable[4] = {
       "recentTracks", "album", "artist", "track" };
    static QString periodTable[5] = {
       "weekly", "overall", "3month", "6month", "12month" };
 
-   d->configGroup = config();
-   d->login = d->configGroup.readEntry("user");
-   d->data = d->configGroup.readEntry("dataType").toInt();\
+   // Load configuration data
+   KConfigGroup configGroup = config();
+   d->login = configGroup.readEntry("user");
+   d->data = configGroup.readEntry("dataType", "0").toInt();\
    d->dataStr = dataTable[d->data % 4];
-   d->period = d->configGroup.readEntry("dataPeriod").toInt();
+   d->period = configGroup.readEntry("dataPeriod", "0").toInt();
    d->periodStr = periodTable[d->period % 5];
-   d->interval =  QString(d->configGroup.readEntry("timer")).toInt();
+   d->interval =  QString(configGroup.readEntry("timer", "5")).toInt();
 
+   // Interval range check
    if(d->interval == 0)
       d->interval = 5;
 }
-
 
 void Lastmoid::fetch()
 {
@@ -261,10 +255,13 @@ void Lastmoid::httpResponse(int id, bool error)
    bool result = false;
    switch(d->state) {
    case NotFound: // Idle state
+      setBusy(true);
       result = parseUserData(data);
       break;
 
    case Finalizing: // Awaiting user data result
+
+      // Create avatar
       d->avatar.loadFromData(data, "JPG");
       if(!d->avatar.isNull()) {
          d->avatar = d->avatar.scaledToHeight(60);
@@ -276,14 +273,13 @@ void Lastmoid::httpResponse(int id, bool error)
       break;
 
    case Identified: // Awaiting data
+      // Parse result
       if(d->data == RecentTracks) result = parseRecentTracks(data);
       else                        result = parseStatData(data);
 
       // Remove busy widget
       if(result && d->busyWidget->isVisible()) {
-         d->layout->removeAt(0);
-         d->layout->addItem(d->scrollWidget);
-         d->busyWidget->hide();
+         setBusy(false);
       }
       break;
 
@@ -322,7 +318,7 @@ bool Lastmoid::parseStatData(const QByteArray& data)
    int maxCount = element.firstChildElement("playcount").text().toInt();
    for(;!element.isNull(); element = element.nextSiblingElement(d->dataStr)) {
 
-      BarLabel* label = new BarLabel(d->dataWidget);
+      BarLabel* label = new BarLabel(this);
 
       // Fix height mismatch and overflowing
       label->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Maximum);
@@ -377,7 +373,7 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
    QFontMetrics fnm(font());
    for (bool flip = true; !element.isNull(); element = element.nextSiblingElement("track")) {
 
-      BarLabel* label = new BarLabel(d->dataWidget);
+      BarLabel* label = new BarLabel(this);
 
       // Fix height mismatch and overflowing
       label->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Maximum);
@@ -447,20 +443,27 @@ void Lastmoid::paintInterface(QPainter *p, const QStyleOptionGraphicsItem *optio
    p->drawText(headerPt, d->login);
 
    // Avatar
-   QPainterPath avClip;
-   QRect avFrame((int)contentsRect.left() + widgetWidth - 60, (int)contentsRect.top(), 60, 60);
-   avClip.addRoundedRect(QRectF(avFrame), 10.0, 10.0);
-   p->setClipPath(avClip);
-   if(!d->avatar.isNull())
-      p->drawImage(avFrame, d->avatar);
-   p->setClipping(false);
+   if(!d->avatar.isNull()) {
 
-   // Avatar border
-   QPen pen(p->pen());
-   pen.setColor(Qt::lightGray);
-   pen.setWidth(2);
-   p->setPen(pen);
-   p->drawRoundedRect(avFrame, 10.0, 10.0);
+      // Create clip path
+      QPainterPath avClip;
+      QRect avFrame((int)contentsRect.left() + widgetWidth - 60, (int)contentsRect.top(), 60, 60);
+      avClip.addRoundedRect(QRectF(avFrame), 10.0, 10.0);
+
+      // Draw clipped avatar
+      p->setClipPath(avClip);
+      if(!d->avatar.isNull())
+         p->drawImage(avFrame, d->avatar);
+      p->setClipping(false);
+
+      // Avatar border
+      QPen pen(p->pen());
+      pen.setColor(Qt::lightGray);
+      pen.setWidth(2);
+      p->setPen(pen);
+      p->drawRoundedRect(avFrame, 10.0, 10.0);
+   }
+
    p->restore();
 }
 
@@ -475,6 +478,25 @@ void Lastmoid::clearList()
 
    // Invalidate layout
    d->dataLayout->invalidate();
+}
+
+void Lastmoid::setBusy(bool val)
+{
+   // Remove current widget
+   if(d->layout->count())
+      d->layout->removeAt(0);
+
+   // If true, replace widget with "Busy" indicator
+   if(val) {
+      d->layout->addItem(d->busyWidget);
+      d->busyWidget->show();
+      d->scrollWidget->hide();
+   }
+   else {
+      d->layout->addItem(d->scrollWidget);
+      d->busyWidget->hide();
+      d->scrollWidget->show();
+   }
 }
 
 #include "lastmoid.moc"
