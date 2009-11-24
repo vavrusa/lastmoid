@@ -84,7 +84,7 @@ struct Lastmoid::Private
    QGraphicsLinearLayout* layout;
    QGraphicsLinearLayout* dataLayout;
    Plasma::ScrollWidget* scrollWidget;
-   Plasma::BusyWidget*    busyWidget;
+   Plasma::BusyWidget*   busyWidget;
 };
 
 Lastmoid::Lastmoid(QObject *parent, const QVariantList &args)
@@ -112,6 +112,7 @@ void Lastmoid::init()
    d->scrollWidget->setWidget(dataWidget);
    d->dataLayout = new QGraphicsLinearLayout(Qt::Vertical, dataWidget);
    d->busyWidget = new Plasma::BusyWidget(this);
+   d->busyWidget->hide();
 
    // Contents widget
    d->layout = new QGraphicsLinearLayout(Qt::Vertical, this);
@@ -123,7 +124,9 @@ void Lastmoid::init()
 
    // Load config and start
    loadConfig();
-   fetch();
+   if(!d->login.isEmpty()) {
+      fetch();
+   }
 }
 
 void Lastmoid::refresh()
@@ -172,7 +175,13 @@ void Lastmoid::configAccepted()
    d->timer.stop();
    d->avatar = QImage();
    d->state = NotFound; // De-initialise current user
-   refresh();
+   if(!d->login.isEmpty()) {
+      d->scrollWidget->show();
+      refresh();
+   }
+   else {
+      d->scrollWidget->hide();
+   }
 }
 
 
@@ -196,6 +205,9 @@ void Lastmoid::loadConfig()
    // Interval range check
    if(d->interval == 0)
       d->interval = 5;
+
+   // Update scene rect
+   update();
 }
 
 void Lastmoid::fetch()
@@ -434,13 +446,34 @@ void Lastmoid::paintInterface(QPainter *p, const QStyleOptionGraphicsItem *optio
    d->svgLogo.resize(94, 48);
    d->svgLogo.paint(p,hAlign, (int)contentsRect.top());
 
-   // User string
+
    p->save();
-   QPoint headerPt(contentsRect.topLeft());
-   headerPt.setX(hAlign);
-   headerPt.setY(headerPt.y() + d->svgLogo.size().height() + 2);
-   p->setPen(QColor(213,13,6));
-   p->drawText(headerPt, d->login);
+
+   // User string
+   if(!d->login.isEmpty()) {
+      QPoint headerPt(contentsRect.topLeft());
+      headerPt.setX(hAlign);
+      headerPt.setY(headerPt.y() + d->svgLogo.size().height() + 2);
+      p->setPen(QColor(213,13,6));
+      p->drawText(headerPt, d->login);
+   } else {
+      // Placeholder
+      QRect msgRect(contentsRect);
+      msgRect.setTop(msgRect.top() + d->svgLogo.size().height() + 2);
+      msgRect.adjust(hAlign,hAlign,-hAlign,-hAlign);
+      msgRect.setHeight(msgRect.height() * 0.5);
+
+      // Icon
+      KIcon icon("configure");
+      p->setOpacity(0.8);
+      icon.paint(p, msgRect, Qt::AlignTop|Qt::AlignHCenter);
+      p->setOpacity(1.0);
+
+      // Text
+      msgRect.moveTop(msgRect.top() + msgRect.height());
+      p->drawText(msgRect, Qt::AlignCenter, tr("User not set."));
+
+   }
 
    // Avatar
    if(!d->avatar.isNull()) {
