@@ -53,9 +53,9 @@ enum State {
 
 struct Lastmoid::Private
 {
-   Private() : interval(0), data(0), period(0), state(NotFound),
-               layout(0), scrollWidget(0), dataWidget(0),
-               dataLayout(0), busyWidget(0)
+   Private() : interval(0), data(0), period(0), connId(-1), state(NotFound),
+               layout(0), scrollWidget(0),dataWidget(0), dataLayout(0),
+               busyWidget(0)
    {}
 
    // Config
@@ -67,6 +67,7 @@ struct Lastmoid::Private
    QString login;
 
    // Containers
+   int connId;
    State state;
    QImage avatar;
    QUrl url;
@@ -96,8 +97,8 @@ Lastmoid::Lastmoid(QObject *parent, const QVariantList &args)
 
 Lastmoid::~Lastmoid()
 {
-   delete d;
    d->timer.stop();
+   delete d;
 }
 
 void Lastmoid::init()
@@ -230,24 +231,33 @@ void Lastmoid::fetch()
 
    // Execute request
    d->http.setHost(d->url.host());
-   d->http.get(d->url.toString());
+   d->connId = d->http.get(d->url.toString());
+   qDebug() << "Query (" << d->connId << "): " << d->url.toString();
 }
 
 void Lastmoid::httpResponse(int id, bool error)
 {
+   // Invalid request
+   if(d->connId != id)
+      return;
+
+   qDebug() << "Response (" << id << "): received " << d->http.bytesAvailable() << " bytes";
+
+   // Error checking
    if(error) {
-      qWarning("Received error during HTTP fetch.");
+      qWarning("received error during HTTP fetch.");
       update();
       return;
    }
 
+   // Evaluate result
    bool result = false;
    switch(d->state) {
-   case NotFound:
+   case NotFound: // Idle state
       result = parseUserData();
       break;
 
-   case Finalizing:
+   case Finalizing: // Awaiting user data result
       d->avatar.loadFromData(d->buffer.buffer(), "JPG");
       if(!d->avatar.isNull()) {
          d->avatar = d->avatar.scaledToHeight(60);
@@ -256,12 +266,15 @@ void Lastmoid::httpResponse(int id, bool error)
             d->buffer.close();
          refresh();
          result = true;
+         update();
       }
       break;
 
-   case Identified:
+   case Identified: // Awaiting data
       if(d->data == RecentTracks) result = parseRecentTracks();
       else                        result = parseStatData();
+
+      // Remove busy widget
       if(result && d->busyWidget->isVisible()) {
          d->layout->removeAt(0);
          d->layout->addItem(d->scrollWidget);
@@ -272,21 +285,18 @@ void Lastmoid::httpResponse(int id, bool error)
    default:
       break;
    }
-
-   if(result) {
-      update();
-   }
 }
 
 bool Lastmoid::parseStatData()
 {
-
+   // Create DOM and import data
    QDomDocument doc("?xml version=\"1.0\" encoding=\"utf-8\" ?");
    QDomElement root, element;
    doc.setContent(d->http.readAll());
    root = doc.firstChildElement("lfm");
    element = root.firstChildElement(d->dataStr);
 
+   // Data period
    if(d->period == Weekly)
       element = root.firstChildElement("weekly" + d->dataStr + "chart");
    else
@@ -313,6 +323,8 @@ bool Lastmoid::parseStatData()
       label->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Maximum);
       label->setMaximumHeight(fnm.height());
       label->setTextFlags(BarLabel::EdgeMark|BarLabel::ElideText);
+
+      // Append text
       switch(d->data) {
       case TopAlbums:
       case TopTracks:
@@ -325,8 +337,9 @@ bool Lastmoid::parseStatData()
          break;
       default:
          break;
-   }
+      }
 
+      // Update bar value
       label->setBarValue(element.firstChildElement("playcount").text().toInt() / (float) maxCount);
       d->dataLayout->addItem(label);
    }
@@ -337,7 +350,7 @@ bool Lastmoid::parseStatData()
 
 bool Lastmoid::parseRecentTracks()
 {
-
+   // Create DOM and import data
    QDomDocument doc("?xml version=\"1.0\" encoding=\"utf-8\" ?");
    QDomElement root, element;
 
@@ -369,10 +382,11 @@ bool Lastmoid::parseRecentTracks()
                      .arg(element.firstChildElement("artist").text())
                      .arg(element.firstChildElement("name").text()));
 
-      // Flip-flop
+      // Flip bar value
       if((flip = !flip))
          label->setBarValue(1.0);
 
+      // Add new label
       d->dataLayout->addItem(label);
    }
 
@@ -381,7 +395,7 @@ bool Lastmoid::parseRecentTracks()
 
 bool Lastmoid::parseUserData()
 {
-
+   // Create DOM and import data
    QDomDocument doc("?xml version=\"1.0\" encoding=\"utf-8\" ?");
    QDomElement root, element;
 
@@ -390,13 +404,17 @@ bool Lastmoid::parseUserData()
    element = root.firstChildElement("user");
    element = element.firstChildElement("image");
 
+   // Check starting element
    if(!element.isNull()) {
+
+      // Fetch avatar
       d->state = Finalizing;
       d->buffer.setData(QByteArray());
       d->buffer.open(QBuffer::ReadWrite);
       d->url.setUrl(element.text());
       d->http.setHost(d->url.host());
-      d->http.get(d->url.toString(), &d->buffer);
+      d->connId = d->http.get(d->url.toString(), &d->buffer);
+      qDebug() << "Query (" << d->connId << "): " << d->url.toString();
       return true;
    }
 
@@ -448,12 +466,14 @@ void Lastmoid::paintInterface(QPainter *p, const QStyleOptionGraphicsItem *optio
 
 void Lastmoid::clearList()
 {
+   // Remove all elements
    while(d->dataLayout->count()) {
       QGraphicsLayoutItem* item = d->dataLayout->itemAt(0);
       d->dataLayout->removeAt(0);
       delete item;
    }
 
+   // Invalidate layout
    d->dataLayout->invalidate();
 }
 
