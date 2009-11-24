@@ -22,16 +22,9 @@
 #define LASTMOID_H
 
 #include <Plasma/Applet>
-#include <Plasma/Svg>
-#include <Plasma/Theme>
-#include <QHttp>
-#include <QString>
-#include <QTimer>
+#include <QByteArray>
 #include <QUrl>
-#include <QBuffer>
 #include <KConfigGroup>
-
-#include "ui_lastmoidConfig.h"
 
 class Lastmoid : public Plasma::Applet
 {
@@ -48,6 +41,7 @@ class Lastmoid : public Plasma::Applet
     public slots:
         void init();
         void refresh();
+        void httpQuery(const QUrl& url);
         void httpResponse(int id, bool error);
 
     protected slots:
@@ -55,9 +49,9 @@ class Lastmoid : public Plasma::Applet
 
     protected:
         void clearList();
-        bool parseUserData();
-        bool parseStatData();
-        bool parseRecentTracks();
+        bool parseUserData(const QByteArray& data);
+        bool parseStatData(const QByteArray& data);
+        bool parseRecentTracks(const QByteArray& data);
         void createConfigurationInterface(KConfigDialog *parent);
 
     private:

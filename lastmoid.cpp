@@ -17,15 +17,19 @@
  *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA .        *
  ***************************************************************************/
 
-#include <Plasma/ScrollWidget>
-#include <Plasma/BusyWidget>
 #include <QGraphicsLinearLayout>
 #include <QDomDocument>
 #include <QDomElement>
 #include <QPainter>
+#include <QHttp>
+#include <QTimer>
+#include <Plasma/Theme>
+#include <Plasma/ScrollWidget>
+#include <Plasma/BusyWidget>
 #include <KConfigDialog>
 #include "lastmoid.h"
 #include "barlabel.h"
+#include "ui_lastmoidConfig.h"
 
 // Data type (mapped to selector)
 enum Data {
@@ -72,7 +76,6 @@ struct Lastmoid::Private
    QImage avatar;
    QUrl url;
    QHttp http;
-   QBuffer buffer;
    QTimer timer;
    Ui::lastmoidConfig configUi;
    Plasma::Svg svgLogo;
@@ -89,6 +92,7 @@ struct Lastmoid::Private
 Lastmoid::Lastmoid(QObject *parent, const QVariantList &args)
    : Plasma::Applet(parent, args), d(new Private)
 {
+   // Init widget defaults
    d->svgLogo.setImagePath("widgets/lastmoid");
    setBackgroundHints(DefaultBackground);
    resize(220, 300);
@@ -116,9 +120,11 @@ void Lastmoid::init()
    d->layout->setContentsMargins(0,60 + fm.height() * 0.5,0,0);
    d->layout->addItem(d->busyWidget);
 
+   // Connect timer and http results
    connect(&d->timer, SIGNAL(timeout()), this, SLOT(refresh()));
    connect(&d->http, SIGNAL(requestFinished(int, bool)),this, SLOT(httpResponse(int, bool)));
 
+   // Load config and start
    loadConfig();
    fetch();
 }
@@ -201,47 +207,47 @@ void Lastmoid::loadConfig()
 void Lastmoid::fetch()
 {
    // Is user initialised?
+   QString url("http://ws.audioscrobbler.com/2.0/?method=");
    switch(d->state) {
    case Identified:
 
       // Recent Tracks
       if(d->data == RecentTracks) {
-         d->url.setUrl("http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user="
-                     + d->login + "&api_key=b6eb61f91b89e55548dd14732ee0b8a1");
+         url.append("user.getrecenttracks&user=" + d->login);
       }
       else {
-         // Top dataType
+         // Charts
          if(d->period == Weekly)
-            d->url.setUrl("http://ws.audioscrobbler.com/2.0/?method=user.getweekly"
-                        + d->dataStr + "chart&user="
-                        + d->login + "&api_key=b6eb61f91b89e55548dd14732ee0b8a1");
+            url.append("user.getweekly" + d->dataStr + "chart&user=" + d->login);
          else
-            d->url.setUrl("http://ws.audioscrobbler.com/2.0/?method=user.gettop"
-                        + d->dataStr + "s&user="
-                        + d->login + "&period="
-                        + d->periodStr +"&api_key=b6eb61f91b89e55548dd14732ee0b8a1");
+            url.append("user.gettop" + d->dataStr + "s&user=" + d->login + "&period=" + d->periodStr);
       }
       break;
 
    default:
-      d->url.setUrl("http://ws.audioscrobbler.com/2.0/?method=user.getinfo&user="
-                    + d->login + "&api_key=b6eb61f91b89e55548dd14732ee0b8a1");
+      url.append("user.getinfo&user=" + d->login);
       break;
    }
 
    // Execute request
-   d->http.setHost(d->url.host());
-   d->connId = d->http.get(d->url.toString());
-   qDebug() << "Query (" << d->connId << "): " << d->url.toString();
+   httpQuery(QUrl(url + "&api_key=b6eb61f91b89e55548dd14732ee0b8a1"));
+}
+
+void Lastmoid::httpQuery(const QUrl &url)
+{
+   d->http.setHost(url.host());
+   d->connId = d->http.get(url.toString());
+   //qDebug() << "Query (" << d->connId << "): " << url.toString();
 }
 
 void Lastmoid::httpResponse(int id, bool error)
 {
    // Invalid request
-   if(d->connId != id)
+   if(d->connId != id) {
       return;
+   }
 
-   qDebug() << "Response (" << id << "): received " << d->http.bytesAvailable() << " bytes";
+   //qDebug() << "Response (" << id << "): received " << d->http.bytesAvailable();
 
    // Error checking
    if(error) {
@@ -251,28 +257,27 @@ void Lastmoid::httpResponse(int id, bool error)
    }
 
    // Evaluate result
+   QByteArray data (d->http.readAll());
    bool result = false;
    switch(d->state) {
    case NotFound: // Idle state
-      result = parseUserData();
+      result = parseUserData(data);
       break;
 
    case Finalizing: // Awaiting user data result
-      d->avatar.loadFromData(d->buffer.buffer(), "JPG");
+      d->avatar.loadFromData(data, "JPG");
       if(!d->avatar.isNull()) {
          d->avatar = d->avatar.scaledToHeight(60);
          d->state = Identified;
-         if(d->buffer.isOpen())
-            d->buffer.close();
-         refresh();
          result = true;
+         refresh();
          update();
       }
       break;
 
    case Identified: // Awaiting data
-      if(d->data == RecentTracks) result = parseRecentTracks();
-      else                        result = parseStatData();
+      if(d->data == RecentTracks) result = parseRecentTracks(data);
+      else                        result = parseStatData(data);
 
       // Remove busy widget
       if(result && d->busyWidget->isVisible()) {
@@ -287,12 +292,12 @@ void Lastmoid::httpResponse(int id, bool error)
    }
 }
 
-bool Lastmoid::parseStatData()
+bool Lastmoid::parseStatData(const QByteArray& data)
 {
    // Create DOM and import data
    QDomDocument doc("?xml version=\"1.0\" encoding=\"utf-8\" ?");
    QDomElement root, element;
-   doc.setContent(d->http.readAll());
+   doc.setContent(data);
    root = doc.firstChildElement("lfm");
    element = root.firstChildElement(d->dataStr);
 
@@ -348,13 +353,13 @@ bool Lastmoid::parseStatData()
 }
 
 
-bool Lastmoid::parseRecentTracks()
+bool Lastmoid::parseRecentTracks(const QByteArray& data)
 {
    // Create DOM and import data
    QDomDocument doc("?xml version=\"1.0\" encoding=\"utf-8\" ?");
    QDomElement root, element;
 
-   doc.setContent (d->http.readAll());
+   doc.setContent (data);
    root = doc.firstChildElement("lfm");
    element = root.firstChildElement("recenttracks");
    element = element.firstChildElement("track");
@@ -393,13 +398,13 @@ bool Lastmoid::parseRecentTracks()
    return true;
 }
 
-bool Lastmoid::parseUserData()
+bool Lastmoid::parseUserData(const QByteArray& data)
 {
    // Create DOM and import data
    QDomDocument doc("?xml version=\"1.0\" encoding=\"utf-8\" ?");
    QDomElement root, element;
 
-   doc.setContent (d->http.readAll());
+   doc.setContent (data);
    root = doc.firstChildElement("lfm");
    element = root.firstChildElement("user");
    element = element.firstChildElement("image");
@@ -409,12 +414,7 @@ bool Lastmoid::parseUserData()
 
       // Fetch avatar
       d->state = Finalizing;
-      d->buffer.setData(QByteArray());
-      d->buffer.open(QBuffer::ReadWrite);
-      d->url.setUrl(element.text());
-      d->http.setHost(d->url.host());
-      d->connId = d->http.get(d->url.toString(), &d->buffer);
-      qDebug() << "Query (" << d->connId << "): " << d->url.toString();
+      httpQuery(QUrl(element.text()));
       return true;
    }
 
