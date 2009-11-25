@@ -237,7 +237,7 @@ void Lastmoid::fetch()
 
       // Recent Tracks
       if(d->data == RecentTracks) {
-         url.append("user.getrecenttracks&user=" + d->login);
+         url.append("user.getrecenttracks&user=" + d->login + "&limit=" + QString::number(d->limit));
       }
       else {
          // Charts
@@ -379,7 +379,11 @@ bool Lastmoid::parseStatData(const QByteArray& data)
 
          // Reuse on list exceeding limit
          if(d->trackList.size() == d->limit) {
+            // Take last
             track = d->trackList.back();
+            d->trackList.pop_back();
+
+            // Reinsert
             d->dataLayout->removeItem(track);
             d->dataLayout->insertItem(i, track);
             d->trackList.insert(i, track);
@@ -427,39 +431,65 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
    doc.setContent (data);
    root = doc.firstChildElement("lfm");
    element = root.firstChildElement("recenttracks");
-   element = element.firstChildElement("track");
+   element = element.lastChildElement("track"); // Reverse read
 
    // Check expected element
    if(element.isNull())
       return false;
 
    // Get new items
-   //clearList();
-   for(bool flip = false;!element.isNull(); element = element.nextSiblingElement("track")) {
+   bool flip = false;
+   for(;!element.isNull(); element = element.previousSiblingElement("track")) {
 
       // Check last date
       int uts = element.firstChildElement("date").attribute("uts").toInt();
 
-      // Create label
-      Track* label = new Track(this);
-      label->setFlags(Track::ElideText);
-      label->setAttribute(Track::Name, element.firstChildElement("name").text());
-      label->setAttribute(Track::Artist, element.firstChildElement("artist").text());
-      label->setFormat(" %a - %n");
+      // Check if is newer
+      if(uts < d->lastDate)
+         continue;
 
-      // Playing
+      // Check "Now Playing"
       if(uts == 0) {
-         label->setFlags(label->flags() | Track::NowPlaying);
+         qDebug() << "fixme: track is now playing (skipping)";
+         continue;
       }
+
+      // Update date
+      d->lastDate = uts;
+
+      // Create label
+      Track* track = 0;
+
+      // Create or reuse
+      if(d->trackList.size() < d->limit) {
+         // Create track
+         track = new Track(this);
+         track->setFlags(Track::ElideText);
+         d->trackList.push_front(track);
+      }
+      else {
+         // Take last
+         track = d->trackList.back();
+         d->trackList.pop_back();
+
+         // Remove from layout
+         d->dataLayout->removeItem(track);
+         d->trackList.push_front(track);
+      }
+
+      // Update attributes
+      track->setAttribute(Track::Name, element.firstChildElement("name").text());
+      track->setAttribute(Track::Artist, element.firstChildElement("artist").text());
+      track->setFormat(" %a - %n");
 
       // Flip bar value
       flip = !flip;
-      if(flip) {
-         label->setBarValue(1.0);
-      }
+      track->setBarValue(1.0 * (int) flip);
+      d->dataLayout->insertItem(0, track);
 
-      // Add new label
-      d->dataLayout->addItem(label);
+      // Animate on rotate
+      if(d->trackList.size() == d->limit)
+         track->animate("opacity", 0.0, 1.0, QEasingCurve::InQuad);
    }
 
    return true;

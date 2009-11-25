@@ -20,6 +20,7 @@
 #define TRACK_H
 
 #include <Plasma/Label>
+#include <QEasingCurve>
 #include <QFlags>
 class QGraphicsWidget;
 class QPropertyAnimation;
@@ -119,7 +120,8 @@ class Track : public Plasma::Label
 
    /** Animate given property.
      */
-   void animate(const QByteArray& property, const QVariant& from, const QVariant& to);
+   void animate(const QByteArray& property, const QVariant& from, const QVariant& to,
+                const QEasingCurve& curve = QEasingCurve::Linear);
 
    /** Current bar color
        \return bar color

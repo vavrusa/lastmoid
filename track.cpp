@@ -48,10 +48,12 @@ void Track::setFormat(const QString &fmt)
    updateLabel();
 }
 
-void Track::animate(const QByteArray& property, const QVariant& from, const QVariant& to)
+void Track::animate(const QByteArray& property, const QVariant& from,
+                    const QVariant& to, const QEasingCurve& curve)
 {
    mAnim->stop();
    mAnim->setTargetObject(this);
+   mAnim->setEasingCurve(curve);
    mAnim->setPropertyName(property);
    mAnim->setDuration(500);
    mAnim->setStartValue(from);
