@@ -445,7 +445,7 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
       int uts = element.firstChildElement("date").attribute("uts").toInt();
 
       // Check if is newer
-      if(uts < d->lastDate)
+      if(uts <= d->lastDate)
          continue;
 
       // Check "Now Playing"
