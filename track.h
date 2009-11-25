@@ -20,16 +20,29 @@
 #define TRACK_H
 
 #include <Plasma/Label>
+#include <QFlags>
 class QGraphicsWidget;
 
+/** Links track data with interactive label.
+  */
 class Track : public Plasma::Label
 {
    Q_OBJECT
+   Q_PROPERTY(QString name READ name WRITE setName)
    Q_PROPERTY(float bar READ barValue WRITE setBarValue)
-   Q_PROPERTY(int barFlags READ barFlags WRITE setBarFlags)
    Q_PROPERTY(QColor barColor READ barColor WRITE setBarColor)
 
    public:
+
+   /** Flags */
+   enum Flag {
+      ElideText  = 0x01,
+      EdgeMark   = 0x02,
+      NowPlaying = 0x04
+   };
+   Q_DECLARE_FLAGS(Flags, Flag)
+
+   /** Constructor */
    explicit Track(QGraphicsWidget *parent = 0);
 
    /** Track name.
@@ -50,12 +63,12 @@ class Track : public Plasma::Label
    /** Return bitmask of track flags defined in BarLabel::Flags
        \return bitmask of flags
      */
-   int barFlags() { return mBarFlags; }
+   Flags flags() { return mFlags; }
    
    /** Set track flags defined in BarLabel::Flags
        \param flags bitmask of flags
      */
-   void setBarFlags(int flags);
+   void setFlags(Flags flags);
 
    /** Return bar percentage 0.0 - 1.0f;
        \param bar percentage
@@ -82,14 +95,6 @@ class Track : public Plasma::Label
      */
    QColor setBarColor(const QColor& color);
 
-   /** Track flags */
-   enum TrackFlag {
-      NoFlags    = 0x00,
-      ElideText  = 0x01,
-      EdgeMark   = 0x02,
-      NowPlaying = 0x04
-   };
-
    protected:
    void resizeEvent(QGraphicsSceneResizeEvent *event);
    void paint(QPainter *painter,
@@ -100,7 +105,9 @@ class Track : public Plasma::Label
    QString mName;   // Original text
    QColor mBarColor;// Bar color (default red)
    float mBarValue; // Progress 0.0f - 1.0f
-   int mBarFlags;   // Bar flags
+   Flags mFlags; // Flags
 };
 
-#endif // BARLABEL_H
+Q_DECLARE_OPERATORS_FOR_FLAGS(Track::Flags)
+
+#endif // TRACK_H

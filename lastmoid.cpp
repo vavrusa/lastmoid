@@ -338,7 +338,7 @@ bool Lastmoid::parseStatData(const QByteArray& data)
       // Fix height mismatch and overflowing
       label->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
       label->setMaximumHeight(fnm.height() * 1.25);
-      label->setBarFlags(Track::EdgeMark|Track::ElideText);
+      label->setFlags(Track::EdgeMark|Track::ElideText);
 
       // Append text
       QString text;
@@ -401,7 +401,7 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
                      .arg(element.firstChildElement("name").text());
       label->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
       label->setMaximumHeight(fnm.height() * 1.25);
-      label->setBarFlags(Track::ElideText);
+      label->setFlags(Track::ElideText);
       label->setName(text);
 
       // Set tooltip
@@ -409,7 +409,7 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
 
       // Playing
       if(uts == 0) {
-         label->setBarFlags(label->barFlags() | Track::NowPlaying);
+         label->setFlags(label->flags() | Track::NowPlaying);
       }
 
       // Flip bar value

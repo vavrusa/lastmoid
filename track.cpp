@@ -25,14 +25,14 @@
 
 Track::Track(QGraphicsWidget *parent) :
     Plasma::Label(parent), mBarColor(QColor(215, 0, 25, 96)),
-    mBarValue(0.0), mBarFlags(NoFlags)
+    mBarValue(0.0)
 {
    setScaledContents(false);
 }
 
-void Track::setBarFlags(int flags)
+void Track::setFlags(Flags flags)
 {
-   mBarFlags = flags;
+   mFlags = flags;
 }
 
 void Track::animate(const QByteArray& property, const QVariant& from, const QVariant& to)
@@ -65,7 +65,7 @@ void Track::resizeEvent(QGraphicsSceneResizeEvent *event)
 {
    Plasma::Label::resizeEvent(event);
 
-   if(barFlags() & ElideText) {
+   if(flags() & ElideText) {
       QFontMetrics fnm(font());
       QString text = fnm.elidedText(name(), Qt::ElideRight, event->newSize().width());
       setText(text);
@@ -85,11 +85,11 @@ void Track::paint(QPainter *painter,
 
       // Bar color
       QColor barColor(mBarColor);
-      if(barFlags() & NowPlaying)
+      if(flags() & NowPlaying)
          barColor = QColor(255, 252, 202, 96); // Soft yellow
 
       // Edge decoration for progress
-      if(barFlags() & EdgeMark) {
+      if(flags() & EdgeMark) {
          float edgeLen = barRect.height() * 0.5;
          barRect.setWidth(barRect.width()  - edgeLen);
          QPainterPath path(barRect.topLeft());
