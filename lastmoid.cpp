@@ -430,7 +430,7 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
       return false;
 
    // Get new items
-   bool flip = false;
+   static bool lastFlip = false;
    for(;!element.isNull(); element = element.previousSiblingElement("track")) {
 
       // Check last date
@@ -474,8 +474,8 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
       track->setFormat(" %a - %n");
 
       // Flip bar value
-      flip = !flip;
-      track->setBarValue(1.0 * (int) flip);
+      lastFlip = !lastFlip;
+      track->setBarValue(1.0 * (int) lastFlip);
 
       // Animate insert
       if(d->trackList.size() == d->limit)
