@@ -375,12 +375,8 @@ bool Lastmoid::parseStatData(const QByteArray& data)
          if(d->trackList.size() == d->limit) {
             // Take last
             track = d->trackList.back();
-            d->trackList.pop_back();
+            d->trackList.move(d->trackList.size() - 1, 0);
 
-            // Reinsert
-            d->dataLayout->removeItem(track);
-            d->dataLayout->insertItem(i, track);
-            d->trackList.insert(i, track);
          } else {
             // Create new track record
             track = new Track(this);
@@ -388,8 +384,10 @@ bool Lastmoid::parseStatData(const QByteArray& data)
             // Update flags
             track->setFlags(Track::EdgeMark|Track::ElideText);
             d->trackList.insert(i, track);
-            d->dataLayout->insertItem(i, track);
          }
+
+         // Reinsert
+         d->dataLayout->insertItem(i, track);
 
          // Update format
          switch(d->data) {
@@ -464,12 +462,11 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
       else {
          // Take last
          track = d->trackList.back();
-         d->trackList.pop_back();
-
-         // Remove from layout
-         //d->dataLayout->removeItem(track);
-         d->trackList.push_front(track);
+         d->trackList.move(d->trackList.size() - 1, 0);
       }
+
+      // Reinsert
+      d->dataLayout->insertItem(0, track);
 
       // Update attributes
       track->setAttribute(Track::Name, element.firstChildElement("name").text());
@@ -479,10 +476,10 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
       // Flip bar value
       flip = !flip;
       track->setBarValue(1.0 * (int) flip);
-      d->dataLayout->insertItem(0, track);
 
       // Animate insert
-      track->animate("opacity", 0.0, 1.0, QEasingCurve::InCirc);
+      if(d->trackList.size() == d->limit)
+         track->animate("opacity", 0.0, 1.0, QEasingCurve::InCirc);
    }
 
    return true;
