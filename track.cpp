@@ -24,24 +24,39 @@
 #include "track.h"
 
 Track::Track(QGraphicsWidget *parent) :
-    Plasma::Label(parent), mBarColor(QColor(215, 0, 25, 96)),
-    mBarValue(0.0)
+    Plasma::Label(parent), mBarValue(0.0), mBarColor(QColor(215, 0, 25, 96))
 {
+   // Set default size
+   QFontMetrics fnm(font());
    setScaledContents(false);
+   setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+   setMaximumHeight(fnm.height() * 1.25);
+
+   // Create animation
+   mAnim = new QPropertyAnimation(this);
 }
 
 void Track::setFlags(Flags flags)
 {
    mFlags = flags;
+   updateLabel();
+}
+
+void Track::setFormat(const QString &fmt)
+{
+   mFormat = fmt;
+   updateLabel();
 }
 
 void Track::animate(const QByteArray& property, const QVariant& from, const QVariant& to)
 {
-   QPropertyAnimation* anim = new QPropertyAnimation(this, property);
-   anim->setDuration(500);
-   anim->setStartValue(from);
-   anim->setEndValue(to);
-   anim->start(QPropertyAnimation::DeleteWhenStopped);
+   mAnim->stop();
+   mAnim->setTargetObject(this);
+   mAnim->setPropertyName(property);
+   mAnim->setDuration(500);
+   mAnim->setStartValue(from);
+   mAnim->setEndValue(to);
+   mAnim->start();
 }
 
 float Track::setBarValue(float val)
@@ -61,15 +76,36 @@ QColor Track::setBarColor(const QColor& color)
    return oldColor;
 }
 
+void Track::updateLabel()
+{
+   // Get text
+   QString text = toString();
+
+   // Update toolTip
+   setToolTip(text);
+
+   // Elide text
+   if(flags() & ElideText) {
+      QFontMetrics fnm(font());
+      setText(fnm.elidedText(text, Qt::ElideRight, contentsRect().width()));
+   }
+}
+
+QString Track::toString() {
+   QString res(format());
+   res.replace("%n", attrib(Name));
+   res.replace("%l", attrib(Album));
+   res.replace("%a", attrib(Artist));   
+   res.replace("%d", attrib(Date));
+   return res;
+}
+
 void Track::resizeEvent(QGraphicsSceneResizeEvent *event)
 {
    Plasma::Label::resizeEvent(event);
 
-   if(flags() & ElideText) {
-      QFontMetrics fnm(font());
-      QString text = fnm.elidedText(name(), Qt::ElideRight, event->newSize().width());
-      setText(text);
-   }
+   // Update label
+   updateLabel();
 }
 
 void Track::paint(QPainter *painter,

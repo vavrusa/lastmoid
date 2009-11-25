@@ -334,33 +334,24 @@ bool Lastmoid::parseStatData(const QByteArray& data)
    for(;!element.isNull(); element = element.nextSiblingElement(d->dataStr)) {
 
       Track* label = new Track(this);
-
-      // Fix height mismatch and overflowing
-      label->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
-      label->setMaximumHeight(fnm.height() * 1.25);
       label->setFlags(Track::EdgeMark|Track::ElideText);
 
       // Append text
-      QString text;
       switch(d->data) {
       case TopAlbums:
       case TopTracks:
-         text = QString(" %1 - %2")
-                        .arg(element.firstChildElement("artist").firstChildElement("name").text())
-                        .arg(element.firstChildElement("name").text());
+         label->setAttribute(Track::Artist, element.firstChildElement("artist").firstChildElement("name").text());
+         label->setAttribute(Track::Name, element.firstChildElement("name").text());
+         label->setFormat("%a - %n");
          break;
       case TopArtists:
-         text = QString(" ") + element.firstChildElement("name").text();
+         label->setAttribute(Track::Artist, element.firstChildElement("name").text());
+         label->setFormat("%a");
          break;
       default:
          break;
       }
 
-      // Update bar value
-      label->setName(text);
-
-      // Set tooltip
-      label->setToolTip(text);
       d->dataLayout->addItem(label);
       label->animate("bar", 0.0, element.firstChildElement("playcount").text().toInt() / (float) maxCount);
    }
@@ -385,7 +376,6 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
       return false;
 
    // Get new items
-   QFontMetrics fnm(font());
    clearList();
    for(bool flip = false;!element.isNull(); element = element.nextSiblingElement("track")) {
 
@@ -394,18 +384,10 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
 
       // Create label
       Track* label = new Track(this);
-
-      // Fix height mismatch and overflowing
-      QString text = QString(tr(" %1 - %2"))
-                     .arg(element.firstChildElement("artist").text())
-                     .arg(element.firstChildElement("name").text());
-      label->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
-      label->setMaximumHeight(fnm.height() * 1.25);
       label->setFlags(Track::ElideText);
-      label->setName(text);
-
-      // Set tooltip
-      label->setToolTip(text);
+      label->setAttribute(Track::Name, element.firstChildElement("name").text());
+      label->setAttribute(Track::Artist, element.firstChildElement("artist").text());
+      label->setFormat("%a - %n");
 
       // Playing
       if(uts == 0) {
