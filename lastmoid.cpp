@@ -336,9 +336,9 @@ bool Lastmoid::parseStatData(const QByteArray& data)
       BarLabel* label = new BarLabel(this);
 
       // Fix height mismatch and overflowing
-      label->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Maximum);
-      label->setMaximumHeight(fnm.height() * 1.2);
-      label->setTextFlags(BarLabel::EdgeMark|BarLabel::ElideText);
+      label->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+      label->setMaximumHeight(fnm.height() * 1.25);
+      label->setBarFlags(BarLabel::EdgeMark|BarLabel::ElideText);
 
       // Append text
       QString text;
@@ -357,7 +357,7 @@ bool Lastmoid::parseStatData(const QByteArray& data)
       }
 
       // Update bar value
-      label->setText(text);
+      label->setName(text);
 
       // Set tooltip
       label->setToolTip(text);
@@ -399,17 +399,17 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
       QString text = QString(tr(" %1 - %2"))
                      .arg(element.firstChildElement("artist").text())
                      .arg(element.firstChildElement("name").text());
-      label->setMaximumHeight(fnm.height() * 1.2);
-      label->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Maximum);
-      label->setTextFlags(BarLabel::ElideText);
-      label->setText(text);
+      label->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+      label->setMaximumHeight(fnm.height() * 1.25);
+      label->setBarFlags(BarLabel::ElideText);
+      label->setName(text);
 
       // Set tooltip
       label->setToolTip(text);
 
       // Playing
       if(uts == 0) {
-         label->setTextFlags(label->textFlags() | BarLabel::Playing);
+         label->setBarFlags(label->barFlags() | BarLabel::NowPlaying);
       }
 
       // Flip bar value

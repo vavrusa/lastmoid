@@ -22,32 +22,40 @@
 #include <Plasma/Label>
 class QGraphicsWidget;
 
-class Track : public Plasma::Label
+class BarLabel : public Plasma::Label
 {
    Q_OBJECT
-   Q_PROPERTY(int textFlags READ textFlags WRITE setTextFlags)
    Q_PROPERTY(float bar READ barValue WRITE setBarValue)
+   Q_PROPERTY(int barFlags READ barFlags WRITE setBarFlags)
    Q_PROPERTY(QColor barColor READ barColor WRITE setBarColor)
 
    public:
    explicit BarLabel(QGraphicsWidget *parent = 0);
 
-   /** Overloaded for storing original text.
+   /** Track name.
+     * \return track name
+     */
+   const QString& name() {
+      return mName;
+   }
+
+   /** Set track name.
        Stored text used for elided.
        \param text text string
      */
-   void setText(const QString& text) {
-      Plasma::Label::setText(mText = text);
+   void setName(const QString& text) {
+      setText(mName = text);
    }
 
-   /** Return bitmask of text flags defined in BarLabel::Flags
+   /** Return bitmask of track flags defined in BarLabel::Flags
        \return bitmask of flags
      */
-   int textFlags() { return mTextFlags; }
-   /** Set text flags defined in BarLabel::Flags
+   int barFlags() { return mBarFlags; }
+   
+   /** Set track flags defined in BarLabel::Flags
        \param flags bitmask of flags
      */
-   void setTextFlags(int flags);
+   void setBarFlags(int flags);
 
    /** Return bar percentage 0.0 - 1.0f;
        \param bar percentage
@@ -74,12 +82,12 @@ class Track : public Plasma::Label
      */
    QColor setBarColor(const QColor& color);
 
-   /** Text flags */
-   enum TextFlags {
-      NoFlags   = 0x00,
-      ElideText = 0x01,
-      EdgeMark  = 0x02,
-      Playing   = 0x04
+   /** Track flags */
+   enum TrackFlag {
+      NoFlags    = 0x00,
+      ElideText  = 0x01,
+      EdgeMark   = 0x02,
+      NowPlaying = 0x04
    };
 
    protected:
@@ -89,10 +97,10 @@ class Track : public Plasma::Label
               QWidget *widget);
 
    private:
-   QString mText;   // Original text
+   QString mName;   // Original text
    QColor mBarColor;// Bar color (default red)
    float mBarValue; // Progress 0.0f - 1.0f
-   int mTextFlags;  // Text flags
+   int mBarFlags;   // Bar flags
 };
 
 #endif // BARLABEL_H

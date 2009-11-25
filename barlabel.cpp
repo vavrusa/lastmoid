@@ -25,22 +25,14 @@
 
 BarLabel::BarLabel(QGraphicsWidget *parent) :
     Plasma::Label(parent), mBarColor(QColor(215, 0, 25, 96)),
-    mBarValue(0.0), mTextFlags(NoFlags)
+    mBarValue(0.0), mBarFlags(NoFlags)
 {
    setScaledContents(false);
 }
 
-void BarLabel::setTextFlags(int flags)
+void BarLabel::setBarFlags(int flags)
 {
-   mTextFlags = flags;
-
-   // Resize
-   QFontMetrics fnm(font());
-   if(flags & Playing) {
-      setPreferredHeight(fnm.height() * 2.0);
-   }
-
-   updateGeometry();
+   mBarFlags = flags;
 }
 
 void BarLabel::animate(const QByteArray& property, const QVariant& from, const QVariant& to)
@@ -73,10 +65,10 @@ void BarLabel::resizeEvent(QGraphicsSceneResizeEvent *event)
 {
    Plasma::Label::resizeEvent(event);
 
-   if(textFlags() & ElideText) {
+   if(barFlags() & ElideText) {
       QFontMetrics fnm(font());
-      QString text = fnm.elidedText(mText, Qt::ElideRight, event->newSize().width());
-      Plasma::Label::setText(text);
+      QString text = fnm.elidedText(name(), Qt::ElideRight, event->newSize().width());
+      setText(text);
    }
 }
 
@@ -93,11 +85,11 @@ void BarLabel::paint(QPainter *painter,
 
       // Bar color
       QColor barColor(mBarColor);
-      if(textFlags() & Playing)
+      if(barFlags() & NowPlaying)
          barColor = QColor(255, 252, 202, 96); // Soft yellow
 
       // Edge decoration for progress
-      if(textFlags() & EdgeMark) {
+      if(barFlags() & EdgeMark) {
          float edgeLen = barRect.height() * 0.5;
          barRect.setWidth(barRect.width()  - edgeLen);
          QPainterPath path(barRect.topLeft());
