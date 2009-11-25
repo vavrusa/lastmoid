@@ -23,6 +23,7 @@
 #include <QPainter>
 #include <QHttp>
 #include <QTimer>
+#include <QStack>
 #include <Plasma/Theme>
 #include <Plasma/ScrollWidget>
 #include <Plasma/BusyWidget>
@@ -99,6 +100,7 @@ Lastmoid::Lastmoid(QObject *parent, const QVariantList &args)
 
 Lastmoid::~Lastmoid()
 {
+   // Stop timer
    d->timer.stop();
    delete d;
 }
@@ -172,6 +174,7 @@ void Lastmoid::configAccepted()
 
    // Reset list and widgets
    clearList();
+   d->lastDate = 0;
    d->timer.stop();
    d->avatar = QImage();
    d->state = NotFound; // De-initialise current user
@@ -334,27 +337,32 @@ bool Lastmoid::parseStatData(const QByteArray& data)
 
       // Fix height mismatch and overflowing
       label->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Maximum);
-      label->setMaximumHeight(fnm.height());
+      label->setMaximumHeight(fnm.height() * 1.2);
       label->setTextFlags(BarLabel::EdgeMark|BarLabel::ElideText);
 
       // Append text
+      QString text;
       switch(d->data) {
       case TopAlbums:
       case TopTracks:
-         label->setText(QString(" %1 - %2")
+         text = QString(" %1 - %2")
                         .arg(element.firstChildElement("artist").firstChildElement("name").text())
-                        .arg(element.firstChildElement("name").text()));
+                        .arg(element.firstChildElement("name").text());
          break;
       case TopArtists:
-         label->setText(QString(" ") + element.firstChildElement("name").text());
+         text = QString(" ") + element.firstChildElement("name").text();
          break;
       default:
          break;
       }
 
       // Update bar value
-      label->setBarValue(element.firstChildElement("playcount").text().toInt() / (float) maxCount);
+      label->setText(text);
+
+      // Set tooltip
+      label->setToolTip(text);
       d->dataLayout->addItem(label);
+      label->animate("bar", 0.0, element.firstChildElement("playcount").text().toInt() / (float) maxCount);
    }
 
    return true;
@@ -373,31 +381,42 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
    element = element.firstChildElement("track");
 
    // Check expected element
-   if(!element.isNull()) {
-      // Clear list
-      clearList();
-   }
-   else {
+   if(element.isNull())
       return false;
-   }
 
-   // Add new items
+   // Get new items
    QFontMetrics fnm(font());
-   for (bool flip = true; !element.isNull(); element = element.nextSiblingElement("track")) {
+   clearList();
+   for(bool flip = false;!element.isNull(); element = element.nextSiblingElement("track")) {
 
+      // Check last date
+      int uts = element.firstChildElement("date").attribute("uts").toInt();
+
+      // Create label
       BarLabel* label = new BarLabel(this);
 
       // Fix height mismatch and overflowing
-      label->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Maximum);
-      label->setMaximumHeight(fnm.height());
-      label->setTextFlags(BarLabel::ElideText);
-      label->setText(QString(" %1 - %2")
+      QString text = QString(tr(" %1 - %2"))
                      .arg(element.firstChildElement("artist").text())
-                     .arg(element.firstChildElement("name").text()));
+                     .arg(element.firstChildElement("name").text());
+      label->setMaximumHeight(fnm.height() * 1.2);
+      label->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Maximum);
+      label->setTextFlags(BarLabel::ElideText);
+      label->setText(text);
+
+      // Set tooltip
+      label->setToolTip(text);
+
+      // Playing
+      if(uts == 0) {
+         label->setTextFlags(label->textFlags() | BarLabel::Playing);
+      }
 
       // Flip bar value
-      if((flip = !flip))
+      flip = !flip;
+      if(flip) {
          label->setBarValue(1.0);
+      }
 
       // Add new label
       d->dataLayout->addItem(label);

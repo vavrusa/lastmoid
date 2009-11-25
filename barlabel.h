@@ -22,7 +22,7 @@
 #include <Plasma/Label>
 class QGraphicsWidget;
 
-class BarLabel : public Plasma::Label
+class Track : public Plasma::Label
 {
    Q_OBJECT
    Q_PROPERTY(int textFlags READ textFlags WRITE setTextFlags)
@@ -47,7 +47,7 @@ class BarLabel : public Plasma::Label
    /** Set text flags defined in BarLabel::Flags
        \param flags bitmask of flags
      */
-   void setTextFlags(int flags) { mTextFlags = flags; }
+   void setTextFlags(int flags);
 
    /** Return bar percentage 0.0 - 1.0f;
        \param bar percentage
@@ -58,6 +58,10 @@ class BarLabel : public Plasma::Label
        \return previous value
      */
    float setBarValue(float bar);
+
+   /** Animate given property.
+     */
+   void animate(const QByteArray& property, const QVariant& from, const QVariant& to);
 
    /** Current bar color
        \return bar color
@@ -74,7 +78,8 @@ class BarLabel : public Plasma::Label
    enum TextFlags {
       NoFlags   = 0x00,
       ElideText = 0x01,
-      EdgeMark  = 0x02
+      EdgeMark  = 0x02,
+      Playing   = 0x04
    };
 
    protected:

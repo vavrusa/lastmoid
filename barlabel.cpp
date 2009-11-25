@@ -16,6 +16,7 @@
  *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA .        *
  ***************************************************************************/
 
+#include <Plasma/Animation>
 #include <QGraphicsSceneResizeEvent>
 #include <QGraphicsWidget>
 #include <QFontMetrics>
@@ -29,11 +30,34 @@ BarLabel::BarLabel(QGraphicsWidget *parent) :
    setScaledContents(false);
 }
 
+void BarLabel::setTextFlags(int flags)
+{
+   mTextFlags = flags;
+
+   // Resize
+   QFontMetrics fnm(font());
+   if(flags & Playing) {
+      setPreferredHeight(fnm.height() * 2.0);
+   }
+
+   updateGeometry();
+}
+
+void BarLabel::animate(const QByteArray& property, const QVariant& from, const QVariant& to)
+{
+   QPropertyAnimation* anim = new QPropertyAnimation(this, property);
+   anim->setDuration(500);
+   anim->setStartValue(from);
+   anim->setEndValue(to);
+   anim->start(QPropertyAnimation::DeleteWhenStopped);
+}
+
 float BarLabel::setBarValue(float val)
 {
    float oldVal = mBarValue;
    mBarValue = val;
    update(boundingRect());
+
    return oldVal;
 }
 
@@ -67,19 +91,25 @@ void BarLabel::paint(QPainter *painter,
       QRectF barRect = boundingRect();
       barRect.setWidth(barRect.width() * mBarValue);
 
+      // Bar color
+      QColor barColor(mBarColor);
+      if(textFlags() & Playing)
+         barColor = QColor(255, 252, 202, 96); // Soft yellow
+
       // Edge decoration for progress
       if(textFlags() & EdgeMark) {
-         barRect.setWidth(barRect.width()  - barRect.height() * 0.75);
+         float edgeLen = barRect.height() * 0.5;
+         barRect.setWidth(barRect.width()  - edgeLen);
          QPainterPath path(barRect.topLeft());
          path.lineTo(barRect.topRight());
-         path.lineTo(barRect.topRight() + QPointF(barRect.height() * 0.75, barRect.height() * 0.5));
+         path.lineTo(barRect.topRight() + QPointF(edgeLen, barRect.height() * 0.5));
          path.lineTo(barRect.bottomRight());
          path.lineTo(barRect.bottomLeft());
          path.closeSubpath();
-         painter->fillPath(path, QBrush(mBarColor));
+         painter->fillPath(path, QBrush(barColor));
       }
       else {
-         painter->fillRect(barRect, QBrush(mBarColor));
+         painter->fillRect(barRect, QBrush(barColor));
       }
    }
 
