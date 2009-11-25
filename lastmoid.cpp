@@ -29,7 +29,7 @@
 #include <Plasma/BusyWidget>
 #include <KConfigDialog>
 #include "lastmoid.h"
-#include "barlabel.h"
+#include "track.h"
 #include "ui_lastmoidConfig.h"
 
 // Data type (mapped to selector)
@@ -333,12 +333,12 @@ bool Lastmoid::parseStatData(const QByteArray& data)
    int maxCount = element.firstChildElement("playcount").text().toInt();
    for(;!element.isNull(); element = element.nextSiblingElement(d->dataStr)) {
 
-      BarLabel* label = new BarLabel(this);
+      Track* label = new Track(this);
 
       // Fix height mismatch and overflowing
       label->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
       label->setMaximumHeight(fnm.height() * 1.25);
-      label->setBarFlags(BarLabel::EdgeMark|BarLabel::ElideText);
+      label->setBarFlags(Track::EdgeMark|Track::ElideText);
 
       // Append text
       QString text;
@@ -393,7 +393,7 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
       int uts = element.firstChildElement("date").attribute("uts").toInt();
 
       // Create label
-      BarLabel* label = new BarLabel(this);
+      Track* label = new Track(this);
 
       // Fix height mismatch and overflowing
       QString text = QString(tr(" %1 - %2"))
@@ -401,7 +401,7 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
                      .arg(element.firstChildElement("name").text());
       label->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
       label->setMaximumHeight(fnm.height() * 1.25);
-      label->setBarFlags(BarLabel::ElideText);
+      label->setBarFlags(Track::ElideText);
       label->setName(text);
 
       // Set tooltip
@@ -409,7 +409,7 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
 
       // Playing
       if(uts == 0) {
-         label->setBarFlags(label->barFlags() | BarLabel::NowPlaying);
+         label->setBarFlags(label->barFlags() | Track::NowPlaying);
       }
 
       // Flip bar value

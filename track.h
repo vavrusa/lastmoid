@@ -16,13 +16,13 @@
  *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA .        *
  ***************************************************************************/
 
-#ifndef BARLABEL_H
-#define BARLABEL_H
+#ifndef TRACK_H
+#define TRACK_H
 
 #include <Plasma/Label>
 class QGraphicsWidget;
 
-class BarLabel : public Plasma::Label
+class Track : public Plasma::Label
 {
    Q_OBJECT
    Q_PROPERTY(float bar READ barValue WRITE setBarValue)
@@ -30,7 +30,7 @@ class BarLabel : public Plasma::Label
    Q_PROPERTY(QColor barColor READ barColor WRITE setBarColor)
 
    public:
-   explicit BarLabel(QGraphicsWidget *parent = 0);
+   explicit Track(QGraphicsWidget *parent = 0);
 
    /** Track name.
      * \return track name

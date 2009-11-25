@@ -21,21 +21,21 @@
 #include <QGraphicsWidget>
 #include <QFontMetrics>
 #include <QPainter>
-#include "barlabel.h"
+#include "track.h"
 
-BarLabel::BarLabel(QGraphicsWidget *parent) :
+Track::Track(QGraphicsWidget *parent) :
     Plasma::Label(parent), mBarColor(QColor(215, 0, 25, 96)),
     mBarValue(0.0), mBarFlags(NoFlags)
 {
    setScaledContents(false);
 }
 
-void BarLabel::setBarFlags(int flags)
+void Track::setBarFlags(int flags)
 {
    mBarFlags = flags;
 }
 
-void BarLabel::animate(const QByteArray& property, const QVariant& from, const QVariant& to)
+void Track::animate(const QByteArray& property, const QVariant& from, const QVariant& to)
 {
    QPropertyAnimation* anim = new QPropertyAnimation(this, property);
    anim->setDuration(500);
@@ -44,7 +44,7 @@ void BarLabel::animate(const QByteArray& property, const QVariant& from, const Q
    anim->start(QPropertyAnimation::DeleteWhenStopped);
 }
 
-float BarLabel::setBarValue(float val)
+float Track::setBarValue(float val)
 {
    float oldVal = mBarValue;
    mBarValue = val;
@@ -53,7 +53,7 @@ float BarLabel::setBarValue(float val)
    return oldVal;
 }
 
-QColor BarLabel::setBarColor(const QColor& color)
+QColor Track::setBarColor(const QColor& color)
 {
    QColor oldColor = mBarColor;
    mBarColor = color;
@@ -61,7 +61,7 @@ QColor BarLabel::setBarColor(const QColor& color)
    return oldColor;
 }
 
-void BarLabel::resizeEvent(QGraphicsSceneResizeEvent *event)
+void Track::resizeEvent(QGraphicsSceneResizeEvent *event)
 {
    Plasma::Label::resizeEvent(event);
 
@@ -72,7 +72,7 @@ void BarLabel::resizeEvent(QGraphicsSceneResizeEvent *event)
    }
 }
 
-void BarLabel::paint(QPainter *painter,
+void Track::paint(QPainter *painter,
            const QStyleOptionGraphicsItem *option,
            QWidget *widget)
 {
@@ -109,4 +109,4 @@ void BarLabel::paint(QPainter *painter,
    Plasma::Label::paint(painter, option, widget);
 }
 
-#include "barlabel.moc"
+#include "track.moc"

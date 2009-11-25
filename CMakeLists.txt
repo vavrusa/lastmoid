@@ -14,7 +14,7 @@ include_directories(
    )
  
 # We add our source code here
-set(lastmoid_SRCS lastmoid.cpp barlabel.cpp)
+set(lastmoid_SRCS lastmoid.cpp track.cpp)
  
 # Now make sure all files get to the right place
 kde4_add_ui_files(lastmoid_SRCS lastmoidConfig.ui)
