@@ -49,7 +49,6 @@ class Lastmoid : public Plasma::Applet
         void setBusy(bool val);
 
     protected:
-        void clearList();
         bool parseUserData(const QByteArray& data);
         bool parseStatData(const QByteArray& data);
         bool parseRecentTracks(const QByteArray& data);

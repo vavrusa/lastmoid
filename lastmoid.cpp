@@ -23,7 +23,7 @@
 #include <QPainter>
 #include <QHttp>
 #include <QTimer>
-#include <QStack>
+#include <QList>
 #include <Plasma/Theme>
 #include <Plasma/ScrollWidget>
 #include <Plasma/BusyWidget>
@@ -31,7 +31,7 @@
 #include "lastmoid.h"
 #include "track.h"
 #include "ui_lastmoidConfig.h"
-
+#include <QFile>
 // Data type (mapped to selector)
 enum Data {
    RecentTracks = 0,
@@ -58,7 +58,7 @@ enum State {
 
 struct Lastmoid::Private
 {
-   Private() : interval(0), data(0), period(0), lastDate(0), connId(-1),
+   Private() : interval(0), data(0), period(0), limit(0), lastDate(0), connId(-1),
                state(NotFound), layout(0), dataLayout(0), scrollWidget(0),
                busyWidget(0)
    {}
@@ -67,6 +67,7 @@ struct Lastmoid::Private
    int interval;
    int data;
    int period;
+   int limit;
    QString dataStr;
    QString periodStr;
    QString login;
@@ -82,6 +83,7 @@ struct Lastmoid::Private
    Plasma::Svg svgLogo;
 
    // Widgets
+   QList<Track*> trackList;
    QGraphicsLinearLayout* layout;
    QGraphicsLinearLayout* dataLayout;
    Plasma::ScrollWidget* scrollWidget;
@@ -152,6 +154,7 @@ void Lastmoid::createConfigurationInterface(KConfigDialog *parent)
    d->configUi.dataType->setCurrentIndex(configGroup.readEntry("dataType", "0").toInt());
    d->configUi.dataPeriod->setCurrentIndex(configGroup.readEntry("dataPeriod", "1").toInt());
    d->configUi.timer->setValue(configGroup.readEntry("timer", "5").toInt());
+   d->configUi.limit->setValue(configGroup.readEntry("limit", "20").toInt());
 
    // Connect controls
    connect(parent, SIGNAL(okClicked()), this, SLOT(configAccepted()));
@@ -164,20 +167,31 @@ void Lastmoid::configAccepted()
    // Save configuration
    KConfigGroup configGroup = config();
    configGroup.writeEntry("user", d->configUi.user->text());
-   configGroup.writeEntry("dataType",QString::number(d->configUi.dataType->currentIndex()));
-   configGroup.writeEntry("dataPeriod",QString::number(d->configUi.dataPeriod->currentIndex()));
-   configGroup.writeEntry("timer",QString::number(d->configUi.timer->value()));
+   configGroup.writeEntry("dataType", QString::number(d->configUi.dataType->currentIndex()));
+   configGroup.writeEntry("dataPeriod", QString::number(d->configUi.dataPeriod->currentIndex()));
+   configGroup.writeEntry("timer", QString::number(d->configUi.timer->value()));
+   configGroup.writeEntry("limit", QString::number(d->configUi.limit->value()));
    configGroup.sync();
 
    // Reload configuration
    loadConfig();
 
-   // Reset list and widgets
-   clearList();
+   // Remove all elements
+   while(!d->trackList.empty()) {
+      d->dataLayout->removeAt(0);
+      d->trackList.front()->deleteLater();
+      d->trackList.pop_front();
+   }
+
+   // Reset last date and timers
    d->lastDate = 0;
    d->timer.stop();
+
+   // Reset avatar and reset state
    d->avatar = QImage();
-   d->state = NotFound; // De-initialise current user
+   d->state = NotFound;
+
+   // Refresh if user available
    if(!d->login.isEmpty()) {
       d->scrollWidget->show();
       refresh();
@@ -204,9 +218,10 @@ void Lastmoid::loadConfig()
    d->period = configGroup.readEntry("dataPeriod", "0").toInt();
    d->periodStr = periodTable[d->period % 5];
    d->interval =  QString(configGroup.readEntry("timer", "5")).toInt();
+   d->limit =  QString(configGroup.readEntry("limit", "20")).toInt();
 
    // Interval range check
-   if(d->interval == 0)
+   if(d->interval <= 0)
       d->interval = 5;
 
    // Update scene rect
@@ -320,45 +335,88 @@ bool Lastmoid::parseStatData(const QByteArray& data)
 
    // Enter group
    element = element.firstChildElement(d->dataStr);
-   if(!element.isNull()) {
-      // Clear list
-      clearList();
-   }
-   else {
+   if(element.isNull()) {
       return false;
    }
 
-   // Add all elements
+   // Evaluate elements
    QFontMetrics fnm(font());
+   QString artist, name;
    int maxCount = element.firstChildElement("playcount").text().toInt();
-   for(;!element.isNull(); element = element.nextSiblingElement(d->dataStr)) {
+   for(int i = 0; i < d->limit && !element.isNull(); element = element.nextSiblingElement(d->dataStr)) {
 
-      Track* label = new Track(this);
-      label->setFlags(Track::EdgeMark|Track::ElideText);
+      // Get basic data
+      artist = element.firstChildElement("artist").firstChildElement("name").text();
+      name = element.firstChildElement("name").text();
 
-      // Append text
-      switch(d->data) {
-      case TopAlbums:
-      case TopTracks:
-         label->setAttribute(Track::Artist, element.firstChildElement("artist").firstChildElement("name").text());
-         label->setAttribute(Track::Name, element.firstChildElement("name").text());
-         label->setFormat("%a - %n");
-         break;
-      case TopArtists:
-         label->setAttribute(Track::Artist, element.firstChildElement("name").text());
-         label->setFormat("%a");
-         break;
-      default:
-         break;
+      // Check track list for match
+      Track* track = 0;
+      if(i < d->trackList.size()) {
+
+         // Attempt to find track
+         for(int k = 0; k < d->trackList.size(); ++k) {
+
+            // Expect track here
+            track = d->trackList.at(k);
+
+            // Compare artist - name
+            if(track->attrib(Track::Artist) == artist &&
+               track->attrib(Track::Name) == name) {
+
+               // Found it, move and save
+               if(i != k) {
+                  d->trackList.move(k, i);
+                  d->dataLayout->removeItem(track);
+                  d->dataLayout->insertItem(i, track);
+               }
+               break;
+            }
+         }
       }
 
-      d->dataLayout->addItem(label);
-      label->animate("bar", 0.0, element.firstChildElement("playcount").text().toInt() / (float) maxCount);
+      // Create or reuse label
+      if(track == 0) {
+
+         // Reuse on list exceeding limit
+         if(d->trackList.size() == d->limit) {
+            track = d->trackList.back();
+            d->dataLayout->removeItem(track);
+            d->dataLayout->insertItem(i, track);
+            d->trackList.insert(i, track);
+         } else {
+            // Create new track record
+            track = new Track(this);
+
+            // Update flags
+            track->setFlags(Track::EdgeMark|Track::ElideText);
+            d->trackList.insert(i, track);
+            d->dataLayout->insertItem(i, track);
+         }
+
+         // Update format
+         switch(d->data) {
+         case TopAlbums:
+         case TopTracks:
+            track->setAttribute(Track::Artist, element.firstChildElement("artist").firstChildElement("name").text());
+            track->setAttribute(Track::Name, element.firstChildElement("name").text());
+            track->setFormat(" %a - %n");
+            break;
+         case TopArtists:
+            track->setAttribute(Track::Artist, element.firstChildElement("name").text());
+            track->setFormat(" %a");
+            break;
+         default:
+            break;
+         }
+      }
+
+      // Update play count
+      track->animate("bar", track->barValue(), element.firstChildElement("playcount").text().toInt() / (float) maxCount);
+      ++i;
    }
 
    return true;
 }
-
 
 bool Lastmoid::parseRecentTracks(const QByteArray& data)
 {
@@ -376,7 +434,7 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
       return false;
 
    // Get new items
-   clearList();
+   //clearList();
    for(bool flip = false;!element.isNull(); element = element.nextSiblingElement("track")) {
 
       // Check last date
@@ -387,7 +445,7 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
       label->setFlags(Track::ElideText);
       label->setAttribute(Track::Name, element.firstChildElement("name").text());
       label->setAttribute(Track::Artist, element.firstChildElement("artist").text());
-      label->setFormat("%a - %n");
+      label->setFormat(" %a - %n");
 
       // Playing
       if(uts == 0) {
@@ -499,19 +557,6 @@ void Lastmoid::paintInterface(QPainter *p, const QStyleOptionGraphicsItem *optio
    }
 
    p->restore();
-}
-
-void Lastmoid::clearList()
-{
-   // Remove all elements
-   while(d->dataLayout->count()) {
-      QGraphicsLayoutItem* item = d->dataLayout->itemAt(0);
-      d->dataLayout->removeAt(0);
-      delete item;
-   }
-
-   // Invalidate layout
-   d->dataLayout->invalidate();
 }
 
 void Lastmoid::setBusy(bool val)
