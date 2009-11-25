@@ -59,6 +59,7 @@ void Track::animate(const QByteArray& property, const QVariant& from,
    mAnim->setStartValue(from);
    mAnim->setEndValue(to);
    mAnim->start();
+   update(boundingRect());
 }
 
 float Track::setBarValue(float val)

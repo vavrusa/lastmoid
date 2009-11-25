@@ -208,7 +208,7 @@ void Lastmoid::loadConfig()
    static QString dataTable[4] = {
       "recentTracks", "album", "artist", "track" };
    static QString periodTable[5] = {
-      "weekly", "overall", "3month", "6month", "12month" };
+      "7day", "overall", "3month", "6month", "12month" };
 
    // Load configuration data
    KConfigGroup configGroup = config();
@@ -241,10 +241,7 @@ void Lastmoid::fetch()
       }
       else {
          // Charts
-         if(d->period == Weekly)
-            url.append("user.getweekly" + d->dataStr + "chart&user=" + d->login);
-         else
-            url.append("user.gettop" + d->dataStr + "s&user=" + d->login + "&period=" + d->periodStr);
+         url.append("user.gettop" + d->dataStr + "s&user=" + d->login + "&period=" + d->periodStr);
       }
       break;
 
@@ -327,11 +324,8 @@ bool Lastmoid::parseStatData(const QByteArray& data)
    root = doc.firstChildElement("lfm");
    element = root.firstChildElement(d->dataStr);
 
-   // Data period
-   if(d->period == Weekly)
-      element = root.firstChildElement("weekly" + d->dataStr + "chart");
-   else
-      element = root.firstChildElement("top" + d->dataStr + "s");
+   // Data period element
+   element = root.firstChildElement("top" + d->dataStr + "s");
 
    // Enter group
    element = element.firstChildElement(d->dataStr);
@@ -444,15 +438,15 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
       // Check last date
       int uts = element.firstChildElement("date").attribute("uts").toInt();
 
-      // Check if is newer
-      if(uts <= d->lastDate)
-         continue;
-
       // Check "Now Playing"
       if(uts == 0) {
          qDebug() << "fixme: track is now playing (skipping)";
          continue;
       }
+
+      // Check if is newer
+      if(uts <= d->lastDate)
+         continue;
 
       // Update date
       d->lastDate = uts;
@@ -473,7 +467,7 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
          d->trackList.pop_back();
 
          // Remove from layout
-         d->dataLayout->removeItem(track);
+         //d->dataLayout->removeItem(track);
          d->trackList.push_front(track);
       }
 
@@ -487,9 +481,8 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
       track->setBarValue(1.0 * (int) flip);
       d->dataLayout->insertItem(0, track);
 
-      // Animate on rotate
-      if(d->trackList.size() == d->limit)
-         track->animate("opacity", 0.0, 1.0, QEasingCurve::InQuad);
+      // Animate insert
+      track->animate("opacity", 0.0, 1.0, QEasingCurve::InCirc);
    }
 
    return true;
