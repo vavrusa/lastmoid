@@ -14,8 +14,8 @@ Damien Lévin <dml_aon@hotmail.com>
 Installation
 ------------
 
-tar xvzf lastmoid-0.6.tar.gz
-cd lastmoid-0.6
+tar xvzf lastmoid-0.6.5.tar.gz
+cd lastmoid-0.6.5
 mkdir build && cd build
 cmake -DCMAKE_INSTALL_PREFIX=`kde4-config --prefix` ..
 make

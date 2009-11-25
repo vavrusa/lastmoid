@@ -1,3 +1,11 @@
+0.6.5
+    - Elided text for labels
+    - Tooltip containing full text
+    - Code cleanup and comments (more to follow)
+    - Reflects invalid (missing) configuration
+    - Animated bars appearance/change
+    - Intelligent list management
+    - Fixed weekly charts data
 0.6
     - Complete code refactoring and cleanup
     - Unified header handling, picture loading
