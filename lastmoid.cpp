@@ -390,6 +390,7 @@ bool Lastmoid::parseStatData(const QByteArray& data)
          d->dataLayout->insertItem(i, track);
 
          // Update format
+         track->setAttribute(Track::PlayCount, element.firstChildElement("playcount").text());
          switch(d->data) {
          case TopAlbums:
          case TopTracks:
@@ -407,7 +408,7 @@ bool Lastmoid::parseStatData(const QByteArray& data)
       }
 
       // Update play count
-      track->animate("bar", track->barValue(), element.firstChildElement("playcount").text().toInt() / (float) maxCount);
+      track->animate("bar", track->barValue(), track->attrib(Track::PlayCount).toInt() / (float) maxCount);
       ++i;
    }
 

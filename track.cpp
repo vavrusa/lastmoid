@@ -85,7 +85,10 @@ void Track::updateLabel()
    QString text = toString();
 
    // Update toolTip
-   setToolTip(text);
+   if(!attrib(PlayCount).isEmpty())
+    setToolTip(text + tr(" (%1 plays)").arg(attrib(PlayCount)));
+   else
+    setToolTip(text);
 
    // Elide text
    if(flags() & ElideText) {
@@ -100,6 +103,7 @@ QString Track::toString() {
    res.replace("%l", attrib(Album));
    res.replace("%a", attrib(Artist));   
    res.replace("%d", attrib(Date));
+   res.replace("%p", attrib(PlayCount));
    return res;
 }
 

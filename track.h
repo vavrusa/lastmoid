@@ -45,10 +45,12 @@ class Track : public Plasma::Label
 
    /** Format */
    enum Attribute {
-      Name   = 0x01,
-      Artist = 0x02,
-      Album  = 0x04,
-      Date   = 0x08
+      Name       = 0x01, /// Track name
+      Artist     = 0x02, /// Track artist
+      Album      = 0x04, /// Track album
+      Date       = 0x08, /// Last time played
+      PlayCount  = 0x10  /// Play count
+
    };
    Q_DECLARE_FLAGS(Format, Attribute)
 
@@ -78,6 +80,7 @@ class Track : public Plasma::Label
      * %l - album
      * %a - artist
      * %d - date played
+     * %p - play count
      * \return display format
      */
    const QString& format() {
@@ -90,6 +93,7 @@ class Track : public Plasma::Label
      * %l - album
      * %a - artist
      * %d - date played
+     * %p - play count
      * \param fmt - format string
      */
    void setFormat(const QString& fmt);
@@ -135,6 +139,9 @@ class Track : public Plasma::Label
    QColor setBarColor(const QColor& color);
 
    protected:
+
+   /** Update text and tooltip for widget size.
+     */
    void updateLabel();
    void resizeEvent(QGraphicsSceneResizeEvent *event);
    void paint(QPainter *painter,
@@ -142,12 +149,12 @@ class Track : public Plasma::Label
               QWidget *widget);
 
    private:  
-   Flags mFlags;     // Flags
-   float mBarValue;  // Progress 0.0f - 1.0f
-   QColor mBarColor; // Bar color (default red)
-   QString mFormat;  // Display text
-   QMap<Attribute,QString> mData; // Data map
-   QPropertyAnimation* mAnim; // Property animation
+   Flags mFlags;     /// Flags
+   float mBarValue;  /// Progress 0.0f - 1.0f
+   QColor mBarColor; /// Bar color (default red)
+   QString mFormat;  /// Display text
+   QMap<Attribute,QString> mData; /// Data map
+   QPropertyAnimation* mAnim; /// Property animation
 };
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(Track::Flags)
