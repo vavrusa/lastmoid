@@ -480,7 +480,7 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
 
       // Animate insert
       if(d->trackList.size() == d->limit)
-         track->animate("opacity", 0.0, 1.0, QEasingCurve::InCirc);
+         track->animate("opacity", 0.0, 1.0);
    }
 
    return true;

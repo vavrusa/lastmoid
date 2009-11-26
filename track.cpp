@@ -16,11 +16,19 @@
  *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA .        *
  ***************************************************************************/
 
-#include <Plasma/Animation>
+
+#include <QtGlobal>
+#include <Plasma/Animator>
 #include <QGraphicsSceneResizeEvent>
 #include <QGraphicsWidget>
 #include <QFontMetrics>
 #include <QPainter>
+
+// Animation
+#if QT_VERSION >= 0x040600
+#include <QPropertyAnimation>
+#endif
+
 #include "track.h"
 
 Track::Track(QGraphicsWidget *parent) :
@@ -31,9 +39,6 @@ Track::Track(QGraphicsWidget *parent) :
    setScaledContents(false);
    setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
    setMaximumHeight(fnm.height() * 1.25);
-
-   // Create animation
-   mAnim = new QPropertyAnimation(this);
 }
 
 void Track::setFlags(Flags flags)
@@ -49,26 +54,32 @@ void Track::setFormat(const QString &fmt)
 }
 
 void Track::animate(const QByteArray& property, const QVariant& from,
-                    const QVariant& to, const QEasingCurve& curve)
+                    const QVariant& to)
 {
-   mAnim->stop();
-   mAnim->setTargetObject(this);
-   mAnim->setEasingCurve(curve);
-   mAnim->setPropertyName(property);
-   mAnim->setDuration(500);
-   mAnim->setStartValue(from);
-   mAnim->setEndValue(to);
-   mAnim->start();
-   update(boundingRect());
+// At least Qt 4.6.0 with QtKinetic
+#if QT_VERSION >= 0x040600
+    // Animate progress
+    QPropertyAnimation* anim = new QPropertyAnimation(this, property, this);
+    anim->setTargetObject(this);
+    anim->setPropertyName(property);
+    anim->setDuration(500);
+    anim->setStartValue(from);
+    anim->setEndValue(to);
+    anim->start(QPropertyAnimation::DeleteWhenStopped);
+#else
+    // Set progress instantly
+    setProperty(property, to);
+    Q_UNUSED(from);
+#endif
 }
 
 float Track::setBarValue(float val)
 {
-   float oldVal = mBarValue;
-   mBarValue = val;
-   update(boundingRect());
+    float oldVal = mBarValue;
+    mBarValue = val;
+    update();
 
-   return oldVal;
+    return oldVal;
 }
 
 QColor Track::setBarColor(const QColor& color)

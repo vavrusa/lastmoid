@@ -20,10 +20,8 @@
 #define TRACK_H
 
 #include <Plasma/Label>
-#include <QEasingCurve>
 #include <QFlags>
 class QGraphicsWidget;
-class QPropertyAnimation;
 
 /** Links track data with interactive label.
   */
@@ -123,9 +121,11 @@ class Track : public Plasma::Label
    QString toString();
 
    /** Animate given property.
+     * \param property - given Q_PROPERTY (opacity, pos, barValue ...)
+     * \param from - starting value
+     * \param to - end value
      */
-   void animate(const QByteArray& property, const QVariant& from, const QVariant& to,
-                const QEasingCurve& curve = QEasingCurve::Linear);
+   void animate(const QByteArray& property, const QVariant& from, const QVariant& to);
 
    /** Current bar color
        \return bar color
@@ -154,7 +154,6 @@ class Track : public Plasma::Label
    QColor mBarColor; /// Bar color (default red)
    QString mFormat;  /// Display text
    QMap<Attribute,QString> mData; /// Data map
-   QPropertyAnimation* mAnim; /// Property animation
 };
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(Track::Flags)
