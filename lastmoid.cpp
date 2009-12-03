@@ -83,7 +83,6 @@ struct Lastmoid::Private
    Plasma::Svg svgLogo;
 
    // Widgets
-   QList<Track*> trackList;
    QGraphicsLinearLayout* layout;
    QGraphicsLinearLayout* dataLayout;
    Plasma::ScrollWidget* scrollWidget;
@@ -177,10 +176,12 @@ void Lastmoid::configAccepted()
    loadConfig();
 
    // Remove all elements
-   while(!d->trackList.empty()) {
-      d->dataLayout->removeAt(0);
-      d->trackList.front()->deleteLater();
-      d->trackList.pop_front();
+   while(d->dataLayout->count() > 0) {
+      Track* t = dynamic_cast<Track*>(d->dataLayout->itemAt(0));
+      if(t != 0) {
+         d->dataLayout->removeItem(t);
+         t->deleteLater();
+      }
    }
 
    // Reset last date and timers
@@ -333,8 +334,16 @@ bool Lastmoid::parseStatData(const QByteArray& data)
       return false;
    }
 
+   // Remove all elements
+   while(d->dataLayout->count() > 0) {
+      Track* t = dynamic_cast<Track*>(d->dataLayout->itemAt(0));
+      if(t != 0) {
+         d->dataLayout->removeItem(t);
+         t->deleteLater();
+      }
+   }
+
    // Evaluate elements
-   QFontMetrics fnm(font());
    QString artist, name;
    int maxCount = element.firstChildElement("playcount").text().toInt();
    for(int i = 0; i < d->limit && !element.isNull(); element = element.nextSiblingElement(d->dataStr)) {
@@ -343,72 +352,30 @@ bool Lastmoid::parseStatData(const QByteArray& data)
       artist = element.firstChildElement("artist").firstChildElement("name").text();
       name = element.firstChildElement("name").text();
 
-      // Check track list for match
-      Track* track = 0;
-      if(i < d->trackList.size()) {
+      // Create new track
+      Track* track = new Track(this);
+      track->setFlags(Track::EdgeMark|Track::ElideText);
+      d->dataLayout->addItem(track);
 
-         // Attempt to find track
-         for(int k = 0; k < d->trackList.size(); ++k) {
-
-            // Expect track here
-            track = d->trackList.at(k);
-
-            // Compare artist - name
-            if(track->attrib(Track::Artist) == artist &&
-               track->attrib(Track::Name) == name) {
-
-               // Found it, move and save
-               if(i != k) {
-                  d->trackList.move(k, i);
-                  d->dataLayout->removeItem(track);
-                  d->dataLayout->insertItem(i, track);
-               }
-               break;
-            }
-         }
-      }
-
-      // Create or reuse label
-      if(track == 0) {
-
-         // Reuse on list exceeding limit
-         if(d->trackList.size() == d->limit) {
-            // Take last
-            track = d->trackList.back();
-            d->trackList.move(d->trackList.size() - 1, 0);
-
-         } else {
-            // Create new track record
-            track = new Track(this);
-
-            // Update flags
-            track->setFlags(Track::EdgeMark|Track::ElideText);
-            d->trackList.insert(i, track);
-         }
-
-         // Reinsert
-         d->dataLayout->insertItem(i, track);
-
-         // Update format
-         track->setAttribute(Track::PlayCount, element.firstChildElement("playcount").text());
-         switch(d->data) {
-         case TopAlbums:
-         case TopTracks:
-            track->setAttribute(Track::Artist, element.firstChildElement("artist").firstChildElement("name").text());
-            track->setAttribute(Track::Name, element.firstChildElement("name").text());
-            track->setFormat(" %a - %n");
-            break;
-         case TopArtists:
-            track->setAttribute(Track::Artist, element.firstChildElement("name").text());
-            track->setFormat(" %a");
-            break;
-         default:
-            break;
-         }
+      // Update format
+      track->setAttribute(Track::PlayCount, element.firstChildElement("playcount").text());
+      switch(d->data) {
+      case TopAlbums:
+      case TopTracks:
+         track->setAttribute(Track::Artist, element.firstChildElement("artist").firstChildElement("name").text());
+         track->setAttribute(Track::Name, element.firstChildElement("name").text());
+         track->setFormat(" %a - %n");
+         break;
+      case TopArtists:
+         track->setAttribute(Track::Artist, element.firstChildElement("name").text());
+         track->setFormat(" %a");
+         break;
+      default:
+         break;
       }
 
       // Update play count
-      track->animate("bar", track->barValue(), track->attrib(Track::PlayCount).toInt() / (float) maxCount);
+      track->setBarValue(track->attrib(Track::PlayCount).toInt() / (float) maxCount);
       ++i;
    }
 
@@ -451,23 +418,20 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
       d->lastDate = uts;
 
       // Create label
-      Track* track = 0;
-
-      // Create or reuse
-      if(d->trackList.size() < d->limit) {
-         // Create track
-         track = new Track(this);
-         track->setFlags(Track::ElideText);
-         d->trackList.push_front(track);
-      }
-      else {
-         // Take last
-         track = d->trackList.back();
-         d->trackList.move(d->trackList.size() - 1, 0);
-      }
+      Track* track = new Track(this);
+      track->setFlags(Track::ElideText);
 
       // Reinsert
       d->dataLayout->insertItem(0, track);
+
+      // Delete end track
+      if(d->dataLayout->count() == d->limit + 1) {
+         Track* t = dynamic_cast<Track*>(d->dataLayout->itemAt(d->dataLayout->count() - 1));
+         if(t != 0) {
+            d->dataLayout->removeItem(t);
+            t->deleteLater();
+         }
+      }
 
       // Update attributes
       track->setAttribute(Track::Name, element.firstChildElement("name").text());
@@ -477,10 +441,6 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
       // Flip bar value
       lastFlip = !lastFlip;
       track->setBarValue(1.0 * (int) lastFlip);
-
-      // Animate insert
-      if(d->trackList.size() == d->limit)
-         track->animate("opacity", 0.0, 1.0);
    }
 
    return true;

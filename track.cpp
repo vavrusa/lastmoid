@@ -144,8 +144,14 @@ void Track::paint(QPainter *painter,
 
       // Edge decoration for progress
       if(flags() & EdgeMark) {
+
+         // Avoid overflow
          float edgeLen = barRect.height() * 0.5;
-         barRect.setWidth(barRect.width()  - edgeLen);
+         if(barRect.width() > edgeLen)
+            barRect.setWidth(barRect.width()  - edgeLen);
+         else
+            barRect.setWidth(0.0);
+
          QPainterPath path(barRect.topLeft());
          path.lineTo(barRect.topRight());
          path.lineTo(barRect.topRight() + QPointF(edgeLen, barRect.height() * 0.5));
