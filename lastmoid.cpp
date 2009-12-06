@@ -290,7 +290,7 @@ void Lastmoid::httpResponse(int id, bool error)
    case Finalizing: // Awaiting user data result
 
       // Create avatar
-      d->avatar.loadFromData(data, "JPG");
+      d->avatar.loadFromData(data);
       if(!d->avatar.isNull()) {
          d->avatar = d->avatar.scaledToHeight(60);
          d->state = Identified;
