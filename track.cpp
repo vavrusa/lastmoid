@@ -165,8 +165,8 @@ void Track::paint(QPainter *painter,
       }
    }
 
-   // Paint widget
-   Plasma::Label::paint(painter, option, widget);
+   // Paint text
+   painter->drawText(boundingRect(), text());
 }
 
 #include "track.moc"

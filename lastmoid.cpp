@@ -225,6 +225,10 @@ void Lastmoid::loadConfig()
    if(d->interval <= 0)
       d->interval = 5;
 
+   // Limit check
+   if(d->limit < 1)
+      d->limit = 1;
+
    // Update scene rect
    update();
 }
@@ -414,9 +418,6 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
       if(uts <= d->lastDate)
          continue;
 
-      // Update date
-      d->lastDate = uts;
-
       // Create label
       Track* track = new Track(this);
       track->setFlags(Track::ElideText);
@@ -425,8 +426,9 @@ bool Lastmoid::parseRecentTracks(const QByteArray& data)
       d->dataLayout->insertItem(0, track);
 
       // Delete end track
-      if(d->dataLayout->count() == d->limit + 1) {
-         Track* t = dynamic_cast<Track*>(d->dataLayout->itemAt(d->dataLayout->count() - 1));
+      int count = d->dataLayout->count();
+      if(count == d->limit + 1) {
+         Track* t = dynamic_cast<Track*>(d->dataLayout->itemAt(count - 1));
          if(t != 0) {
             d->dataLayout->removeItem(t);
             t->deleteLater();
@@ -462,7 +464,13 @@ bool Lastmoid::parseUserData(const QByteArray& data)
 
       // Fetch avatar
       d->state = Finalizing;
-      httpQuery(QUrl(element.text()));
+      if(!element.text().isEmpty())
+         httpQuery(QUrl(element.text()));
+      else {
+         // No avatar available, continue
+         d->state = Identified;
+         refresh();
+      }
       return true;
    }
 
