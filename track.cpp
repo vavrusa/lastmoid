@@ -23,12 +23,6 @@
 #include <QGraphicsWidget>
 #include <QFontMetrics>
 #include <QPainter>
-
-// Animation
-#if QT_VERSION >= 0x040600
-#include <QPropertyAnimation>
-#endif
-
 #include "track.h"
 
 Track::Track(QGraphicsWidget *parent) :
@@ -53,26 +47,6 @@ void Track::setFormat(const QString &fmt)
    updateLabel();
 }
 
-void Track::animate(const QByteArray& property, const QVariant& from,
-                    const QVariant& to)
-{
-// At least Qt 4.6.0 with QtKinetic
-#if QT_VERSION >= 0x040600
-    // Animate progress
-    QPropertyAnimation* anim = new QPropertyAnimation(this, property, this);
-    anim->setTargetObject(this);
-    anim->setPropertyName(property);
-    anim->setDuration(500);
-    anim->setStartValue(from);
-    anim->setEndValue(to);
-    anim->start(QPropertyAnimation::DeleteWhenStopped);
-#else
-    // Set progress instantly
-    setProperty(property, to);
-    Q_UNUSED(from);
-#endif
-}
-
 float Track::setBarValue(float val)
 {
     float oldVal = mBarValue;
@@ -86,7 +60,7 @@ QColor Track::setBarColor(const QColor& color)
 {
    QColor oldColor = mBarColor;
    mBarColor = color;
-   update(boundingRect());
+   update();
    return oldColor;
 }
 
@@ -130,6 +104,10 @@ void Track::paint(QPainter *painter,
            const QStyleOptionGraphicsItem *option,
            QWidget *widget)
 {
+   // Unused
+   Q_UNUSED(option);
+   Q_UNUSED(widget);
+
    // Paint background
    if(mBarValue > 0.0) {
       painter->setRenderHint(QPainter::Antialiasing);

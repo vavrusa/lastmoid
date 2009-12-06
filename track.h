@@ -120,13 +120,6 @@ class Track : public Plasma::Label
      */
    QString toString();
 
-   /** Animate given property.
-     * \param property - given Q_PROPERTY (opacity, pos, barValue ...)
-     * \param from - starting value
-     * \param to - end value
-     */
-   void animate(const QByteArray& property, const QVariant& from, const QVariant& to);
-
    /** Current bar color
        \return bar color
      */
